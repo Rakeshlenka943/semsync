@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+   THEME VARIABLES (Default Theme - Warm Minimalist)
+   ============================================================ */
+:root {
+  /* Backgrounds */
+  --bg: #F5F0E8;
+  --surface: #EDE8DF;
+  --card: #FFFFFF;
+
+  /* Text */
+  --text-primary: #2C2520;
+  --text-secondary: #6B5F54;
+  --text-muted: #A89885;
+
+  /* Accent */
+  --accent: #C97B5A;
+  --accent-hover: #B06345;
+  --accent-light: rgba(201, 123, 90, 0.15);
+
+  /* Status */
+  --success: #7CA58C;
+  --warning: #D4A74A;
+  --danger: #C45A5A;
+
+  /* Borders & Shadows */
+  --border: #DCD5C9;
+  --shadow: rgba(44, 37, 32, 0.08);
+
+  /* Sticky Note (always yellow) */
+  --sticky-bg: #FDFD96;
+  --sticky-text: #2C2520;
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}

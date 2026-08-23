@@ -32,28 +32,46 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-4">Login</h2>
+    <div className="p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--card)' }}>
+      <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Login</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Username, Email, or Roll Number</label>
+          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Username, Email, or Roll Number
+          </label>
           <input
             type="text"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+            style={{
+              backgroundColor: 'var(--bg)',
+              borderColor: 'var(--border)',
+              color: 'var(--text-primary)',
+              '--tw-ring-color': 'var(--accent)',
+            }}
             required
             placeholder="username, email, or roll number"
           />
-          <p className="text-xs text-gray-500 mt-1">You can login with your username, email, or roll number.</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+            You can login with your username, email, or roll number.
+          </p>
         </div>
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Password</label>
+          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Password
+          </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+            style={{
+              backgroundColor: 'var(--bg)',
+              borderColor: 'var(--border)',
+              color: 'var(--text-primary)',
+              '--tw-ring-color': 'var(--accent)',
+            }}
             required
           />
         </div>
@@ -61,16 +79,18 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
           <button
             type="button"
             onClick={onForgotPassword}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm hover:underline"
+            style={{ color: 'var(--accent)' }}
           >
             Forgot Password?
           </button>
         </div>
-        {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
+        {error && <div className="text-sm mb-2" style={{ color: 'var(--danger)' }}>{error}</div>}
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50"
+          className="w-full font-semibold py-2 px-4 rounded-md transition disabled:opacity-50"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
         >
           {isLoading ? 'Logging in...' : 'Login'}
         </button>

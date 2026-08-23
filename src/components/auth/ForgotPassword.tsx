@@ -35,14 +35,15 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
 
   if (success) {
     return (
-      <div className="text-center p-4">
-        <div className="text-green-600 text-xl mb-2">✅ Email Sent!</div>
-        <p className="text-gray-600 dark:text-gray-400">
+      <div className="p-6 rounded-lg shadow-md text-center" style={{ backgroundColor: 'var(--card)' }}>
+        <div className="text-xl mb-2" style={{ color: 'var(--success)' }}>✅ Email Sent!</div>
+        <p style={{ color: 'var(--text-secondary)' }}>
           If an account exists with this email, you'll receive a password reset link shortly.
         </p>
         <button
           onClick={onBack}
-          className="mt-4 text-blue-600 hover:underline"
+          className="mt-4 hover:underline"
+          style={{ color: 'var(--accent)' }}
         >
           Back to Login
         </button>
@@ -51,35 +52,42 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
   }
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-4">Forgot Password</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+    <div className="p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--card)' }}>
+      <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Forgot Password</h2>
+      <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
         Enter your email address and we'll send you a link to reset your password.
       </p>
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+            style={{
+              backgroundColor: 'var(--bg)',
+              borderColor: 'var(--border)',
+              color: 'var(--text-primary)',
+            }}
             required
             placeholder="your.email@example.com"
           />
         </div>
-        {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
+        {error && <div className="text-sm mb-2" style={{ color: 'var(--danger)' }}>{error}</div>}
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md disabled:opacity-50"
+          className="w-full font-semibold py-2 px-4 rounded-md transition disabled:opacity-50"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
         >
           {isLoading ? 'Sending...' : 'Send Reset Link'}
         </button>
         <button
           type="button"
           onClick={onBack}
-          className="w-full mt-2 text-sm text-gray-600 dark:text-gray-400 hover:underline"
+          className="w-full mt-2 text-sm hover:underline"
+          style={{ color: 'var(--text-muted)' }}
         >
           Back to Login
         </button>

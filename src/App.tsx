@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 import { ForgotPassword } from './components/auth/ForgotPassword';
 import { ResetPassword } from './components/auth/ResetPassword';
+import { Dashboard } from './components/Dashboard';
+import { TimetableBuilder } from './components/TimetableBuilder';
+import { MonthlyHeatmap } from './components/MonthlyHeatmap';
+import { SemesterDates } from './components/SemesterDates';
+
+type Page = 'dashboard' | 'timetable' | 'heatmap' | 'syllabus' | 'deadlines' | 'exams' | 'semester' | 'whisper' | 'theme' | 'settings';
 
 function AppContent() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading } = useAuth();
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [showRegister, setShowRegister] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
 
-  // Check if we're on the reset password page
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes('access_token')) {
       setShowResetPassword(true);
-      // Clean the URL to remove the token (optional)
-      // window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
@@ -25,14 +30,11 @@ function AppContent() {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
-  // 🔑 If user is on reset password page, show ResetPassword component
   if (showResetPassword) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
         <ResetPassword onSuccess={() => {
           setShowResetPassword(false);
-          // Log out after reset to force user to login with new password
-          logout();
         }} />
       </div>
     );
@@ -41,7 +43,7 @@ function AppContent() {
   if (!user) {
     if (showForgotPassword) {
       return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
           <ForgotPassword 
             onBack={() => setShowForgotPassword(false)}
             onSuccess={() => setShowForgotPassword(false)}
@@ -51,15 +53,15 @@ function AppContent() {
     }
 
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
         <div className="w-full max-w-md">
-          <h1 className="text-3xl font-bold text-center mb-6 text-blue-600">SemSync</h1>
+          <h1 className="text-3xl font-bold text-center mb-6" style={{ color: 'var(--accent)' }}>SemSync</h1>
           {showRegister ? (
             <div>
               <Register />
-              <p className="text-center mt-4 text-sm">
+              <p className="text-center mt-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Already have an account?{' '}
-                <button onClick={() => setShowRegister(false)} className="text-blue-600 underline">
+                <button onClick={() => setShowRegister(false)} className="underline" style={{ color: 'var(--accent)' }}>
                   Login
                 </button>
               </p>
@@ -67,9 +69,9 @@ function AppContent() {
           ) : (
             <div>
               <Login onForgotPassword={() => setShowForgotPassword(true)} />
-              <p className="text-center mt-4 text-sm">
+              <p className="text-center mt-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Don't have an account?{' '}
-                <button onClick={() => setShowRegister(true)} className="text-blue-600 underline">
+                <button onClick={() => setShowRegister(true)} className="underline" style={{ color: 'var(--accent)' }}>
                   Sign up
                 </button>
               </p>
@@ -80,31 +82,35 @@ function AppContent() {
     );
   }
 
-  // ✅ LOGGED IN DASHBOARD
+  // Render based on current page
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'timetable':
+        return <TimetableBuilder onBack={() => setCurrentPage('dashboard')} />;
+      case 'heatmap':
+        return <MonthlyHeatmap onBack={() => setCurrentPage('dashboard')} />;
+      case 'semester':
+        return <SemesterDates onBack={() => setCurrentPage('dashboard')} />;
+      // Other pages will be added later
+      default:
+        return <Dashboard onNavigate={setCurrentPage} />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
-      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Welcome back, {user.username}!</h2>
-          <button
-            onClick={logout}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-md transition"
-          >
-            Logout
-          </button>
-        </div>
-        <p className="text-gray-600 dark:text-gray-400">Your batch: {user.batch_badge}</p>
-        <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">Email: {user.email || 'Not set'}</p>
-      </div>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
+      {renderPage()}
     </div>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
