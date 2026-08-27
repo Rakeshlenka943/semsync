@@ -14,20 +14,12 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: new Error('Invalid roll number') };
   }
 
-  // 1. Check if roll number already exists in the users table
-  const { data: existingUser, error: checkError } = await supabase
-    .from('users')
-    .select('roll_number')
-    .eq('roll_number', rollNumber)
-    .maybeSingle();
-
-  if (existingUser) {
-    return { user: null, error: new Error('Roll number already registered. Please login or use a different roll number.') };
-  }
-
   const email = `${rollNumber}@gmail.com`;
 
-  // 2. Create auth user (the trigger will insert the profile)
+  // 🔥 FIX: Clear any existing session before signup (prevents stale token issues)
+  await supabase.auth.signOut();
+
+  // 1. Create auth user (the trigger will insert the profile)
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -42,17 +34,18 @@ export async function signUp(data: SignUpData) {
   });
 
   if (authError) {
-    console.error('Auth signup error:', authError);
-    // If the auth error is because email is already taken, provide a clearer message
-    if (authError.message.includes('User already registered')) {
-      return { user: null, error: new Error('This email/roll number is already registered. Please login or use a different roll number.') };
+    // Check if user already exists in auth
+    if (authError.message?.includes('User already registered')) {
+      return {
+        user: null,
+        error: new Error('This roll number is already registered. Please login instead.'),
+      };
     }
+    console.error('Auth signup error:', authError);
     return { user: null, error: authError };
   }
 
-  // 3. Fetch the newly created user profile (trigger should have created it)
-  // Wait a moment for the trigger to complete
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // 2. Fetch the newly created user profile (trigger should have created it)
   const { data: userData, error: fetchError } = await supabase
     .from('users')
     .select('*')
@@ -90,6 +83,7 @@ export async function signIn(credentials: AuthCredentials) {
 }
 
 export async function signOut() { return supabase.auth.signOut(); }
+
 export async function getCurrentUser() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { user: null, error: null };
@@ -98,6 +92,7 @@ export async function getCurrentUser() {
   const { data: userData, error } = await supabase.from('users').select('*').eq('roll_number', rollNumber).single();
   return { user: userData as User | null, error };
 }
+
 export async function resetPassword(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + '/reset-password',
