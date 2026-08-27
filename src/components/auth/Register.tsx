@@ -152,6 +152,7 @@ export const Register: React.FC = () => {
               }}
               required
               minLength={6}
+              placeholder="Enter password"
             />
             <button
               type="button"
@@ -178,6 +179,7 @@ export const Register: React.FC = () => {
                 color: 'var(--text-primary)',
               }}
               required
+              placeholder="Confirm password"
             />
             <button
               type="button"

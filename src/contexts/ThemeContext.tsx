@@ -20,29 +20,32 @@ interface ThemeContextType {
   applyCustomTheme: (colors: CustomColors) => void;
 }
 
+// Read saved theme from localStorage before the component mounts
+const savedTheme = localStorage.getItem('semsync-theme');
+let initialTheme: ThemePreset = 'default';
+let initialCustomColors: CustomColors | null = null;
+if (savedTheme) {
+  try {
+    const parsed = JSON.parse(savedTheme);
+    initialTheme = parsed.theme || 'default';
+    initialCustomColors = parsed.customColors || null;
+  } catch {}
+}
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<ThemePreset>('default');
-  const [customColors, setCustomColors] = useState<CustomColors | null>(null);
+  const [theme, setTheme] = useState<ThemePreset>(initialTheme);
+  const [customColors, setCustomColors] = useState<CustomColors | null>(initialCustomColors);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('semsync-theme');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setTheme(parsed.theme || 'default');
-        if (parsed.customColors) setCustomColors(parsed.customColors);
-      } catch {}
-    }
-  }, []);
-
+  // Apply theme whenever it changes
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
     if (theme === 'custom' && customColors) {
       applyCustomTheme(customColors);
     }
+    // Persist to localStorage
     localStorage.setItem('semsync-theme', JSON.stringify({ theme, customColors }));
   }, [theme, customColors]);
 
@@ -63,7 +66,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     theme,
     setTheme,
     customColors,
-    setCustomColors,
+    setCustomColors: (colors: CustomColors) => {
+      setCustomColors(colors);
+      // The useEffect will apply it automatically
+    },
     applyCustomTheme,
   };
 

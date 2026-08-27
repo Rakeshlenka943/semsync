@@ -13,6 +13,7 @@ import { SyllabusTracker } from './components/SyllabusTracker';
 import { DeadlinesManager } from './components/DeadlinesManager';
 import { ExamManagement } from './components/ExamManagement';
 import { ThemeForge } from './components/ThemeForge';
+import { WhisperNetwork } from './components/WhisperNetwork';
 import { Settings } from './components/Settings';
 import { GlobalNav } from './components/GlobalNav';
 
@@ -99,6 +100,8 @@ function AppContent() {
         return <ExamManagement onBack={() => setCurrentPage('dashboard')} />;
       case 'theme':
         return <ThemeForge onBack={() => setCurrentPage('dashboard')} />;
+      case 'whisper':
+        return <WhisperNetwork onBack={() => setCurrentPage('dashboard')} />;
       case 'settings':
         return <Settings onBack={() => setCurrentPage('dashboard')} />;
       default:

@@ -14,9 +14,6 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Optional: visual gibberish for password display
-  const [gibberishMode, setGibberishMode] = useState(false);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -36,9 +33,6 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
     setIsLoading(false);
   };
 
-  // Toggle between plain text and gibberish
-  const toggleShow = () => setShowPassword(!showPassword);
-
   return (
     <div className="p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--card)' }}>
       <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Login</h2>
@@ -56,7 +50,6 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
               backgroundColor: 'var(--bg)',
               borderColor: 'var(--border)',
               color: 'var(--text-primary)',
-              '--tw-ring-color': 'var(--accent)',
             }}
             required
             placeholder="username, email, or roll number"
@@ -77,35 +70,22 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
                 backgroundColor: 'var(--bg)',
                 borderColor: 'var(--border)',
                 color: 'var(--text-primary)',
-                '--tw-ring-color': 'var(--accent)',
               }}
               required
-              placeholder={showPassword ? (gibberishMode ? '• • • • • •' : 'Enter password') : 'Enter password'}
+              minLength={6}
+              placeholder="Enter password"
             />
             <button
               type="button"
-              onClick={toggleShow}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               style={{ color: 'var(--text-muted)' }}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-          <div className="flex justify-between items-center mt-1">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {showPassword ? 'Password visible' : 'Password hidden'}
-            </span>
-            <button
-              type="button"
-              onClick={() => setGibberishMode(!gibberishMode)}
-              className="text-xs underline hover:opacity-70"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {gibberishMode ? 'Show real chars' : 'Show gibberish'}
-            </button>
-          </div>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            Click the eye to toggle visibility.
+            {showPassword ? 'Password is visible' : 'Password is hidden'}
           </p>
         </div>
 
