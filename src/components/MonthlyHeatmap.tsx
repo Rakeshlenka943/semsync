@@ -84,7 +84,8 @@ function getSubjectStatsUpToDate(
   allLogs: AttendanceLog[],
   upToDate: Date,
   subjectName: string,
-  isLab: boolean
+  isLab: boolean,
+  target: number
 ): SubjectAttendanceStats {
   const upToDateStr = getLocalDateStr(upToDate);
   const relevantLogs = allLogs.filter(log => {
@@ -121,7 +122,7 @@ function getSubjectStatsUpToDate(
   };
 }
 
-// Tooltip Button
+// Tooltip Button (fixed position)
 const TooltipButton: React.FC<{
   children: React.ReactNode;
   tooltip: string;
@@ -230,6 +231,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
   const [holidayStartDate, setHolidayStartDate] = useState<string>('');
   const [holidayEndDate, setHolidayEndDate] = useState<string>('');
   const [holidayLoading, setHolidayLoading] = useState(false);
+  const [globalTarget, setGlobalTarget] = useState<number>(75);
+  const [subjectTargets, setSubjectTargets] = useState<Map<string, number>>(new Map());
 
   // Data fetching
   useEffect(() => {
@@ -241,6 +244,24 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       const startStr = getLocalDateStr(startDate);
       const endStr = getLocalDateStr(endDate);
 
+      // Fetch global target
+      const { data: profile } = await supabase
+        .from('users')
+        .select('attendance_target')
+        .eq('roll_number', user.roll_number)
+        .single();
+      if (profile?.attendance_target) setGlobalTarget(profile.attendance_target);
+
+      // Fetch subject targets
+      const { data: targets } = await supabase
+        .from('subject_attendance_targets')
+        .select('subject_code, target_percentage')
+        .eq('user_roll', user.roll_number);
+      const targetMap = new Map<string, number>();
+      targets?.forEach(t => targetMap.set(t.subject_code, t.target_percentage));
+      setSubjectTargets(targetMap);
+
+      // Fetch semester dates
       const { data: semData } = await supabase
         .from('semester_dates')
         .select('semester_start, semester_end')
@@ -249,6 +270,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       if (semData?.semester_start) setSemesterStartDate(new Date(semData.semester_start));
       if (semData?.semester_end) setSemesterEndDate(new Date(semData.semester_end));
 
+      // Fetch active slots
       const { data: slotsData } = await supabase
         .from('timetable_slots')
         .select('*')
@@ -256,6 +278,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         .eq('is_active', true);
       if (slotsData) setSlots(slotsData);
 
+      // Fetch logs for the month
       const { data: logsData } = await supabase
         .from('attendance_logs')
         .select('*')
@@ -386,7 +409,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Mass Holiday – direct bulk upsert
+  // Mass Holiday – bulk upsert, no confirmation
   const handleMassHoliday = async () => {
     if (!user || !holidayStartDate || !holidayEndDate) return;
     const start = new Date(holidayStartDate);
@@ -939,7 +962,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     )}
                   </div>
 
-                  {/* Quick Actions */}
+                  {/* Quick Actions – no confirmation */}
                   <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-xs font-medium mr-1" style={{ color: 'var(--text-secondary)' }}>⚡ Quick:</span>
@@ -970,12 +993,14 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                   {/* Subjects */}
                   {subjects.map((subject: any) => {
                     const isExpanded = expandedSubject === subject.code;
+                    const target = subjectTargets.get(subject.code) || globalTarget;
                     const stats = getSubjectStatsUpToDate(
                       subject.code,
                       allLogs,
                       selectedDay,
                       subject.slot.subject_name,
-                      subject.slot.is_lab
+                      subject.slot.is_lab,
+                      target
                     );
                     const currentStatus = subject.status;
 
@@ -1007,9 +1032,16 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                             {currentStatus === 'no_data' && (
                               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Not marked</span>
                             )}
+                            {subjectTargets.has(subject.code) && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}>
+                                Target: {target}%
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{Math.round(stats.percentage)}%</span>
+                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                              {Math.round(stats.percentage)}%
+                            </span>
                             {subject.isExtraClass && (
                               <button
                                 onClick={(e) => {
@@ -1227,7 +1259,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal – only for delete extra class */}
       {showConfirmModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"

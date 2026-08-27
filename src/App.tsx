@@ -11,6 +11,9 @@ import { MonthlyHeatmap } from './components/MonthlyHeatmap';
 import { SemesterDates } from './components/SemesterDates';
 import { SyllabusTracker } from './components/SyllabusTracker';
 import { DeadlinesManager } from './components/DeadlinesManager';
+import { ExamManagement } from './components/ExamManagement';
+import { ThemeForge } from './components/ThemeForge';
+import { Settings } from './components/Settings';
 import { GlobalNav } from './components/GlobalNav';
 
 type Page = 'dashboard' | 'timetable' | 'heatmap' | 'syllabus' | 'deadlines' | 'exams' | 'semester' | 'whisper' | 'theme' | 'settings';
@@ -92,6 +95,12 @@ function AppContent() {
         return <SyllabusTracker onBack={() => setCurrentPage('dashboard')} />;
       case 'deadlines':
         return <DeadlinesManager onBack={() => setCurrentPage('dashboard')} />;
+      case 'exams':
+        return <ExamManagement onBack={() => setCurrentPage('dashboard')} />;
+      case 'theme':
+        return <ThemeForge onBack={() => setCurrentPage('dashboard')} />;
+      case 'settings':
+        return <Settings onBack={() => setCurrentPage('dashboard')} />;
       default:
         return <Dashboard onNavigate={setCurrentPage} />;
     }

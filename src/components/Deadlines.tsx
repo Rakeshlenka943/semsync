@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { CheckCircle, Circle, Plus, Calendar, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Circle, Plus, Calendar, AlertTriangle, Trash2, X } from 'lucide-react';
 
 interface Deadline {
   id: string;
@@ -44,7 +44,6 @@ export const Deadlines: React.FC = () => {
       .select('subject_name')
       .eq('user_roll', user?.roll_number)
       .eq('is_active', true);
-
     if (!error && data) {
       const unique = Array.from(new Set(data.map(s => s.subject_name)));
       setSubjects(unique);
@@ -53,8 +52,6 @@ export const Deadlines: React.FC = () => {
 
   const fetchDeadlines = async () => {
     if (!user) return;
-    
-    // Auto-remove deadlines older than 7 days
     const now = new Date();
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -67,7 +64,6 @@ export const Deadlines: React.FC = () => {
       .lt('due_date', sevenDaysAgo.toISOString())
       .eq('is_completed', false);
 
-    // Fetch deadlines due within 7 days
     const sevenDaysFromNow = new Date(now);
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
@@ -95,7 +91,17 @@ export const Deadlines: React.FC = () => {
       .from('deadlines')
       .update({ is_completed: true })
       .eq('id', id);
+    if (!error) {
+      setDeadlines(prev => prev.filter(d => d.id !== id));
+    }
+  };
 
+  const deleteDeadline = async (id: string) => {
+    if (!window.confirm('Delete this deadline?')) return;
+    const { error } = await supabase
+      .from('deadlines')
+      .delete()
+      .eq('id', id);
     if (!error) {
       setDeadlines(prev => prev.filter(d => d.id !== id));
     }
@@ -175,16 +181,14 @@ export const Deadlines: React.FC = () => {
           return (
             <div
               key={d.id}
-              className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-opacity-5 transition"
+              className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-opacity-5 transition group"
               style={{
                 backgroundColor: 'var(--card)',
                 borderColor: urgent ? 'var(--danger)' : 'var(--border)',
                 boxShadow: urgent ? '0 0 0 1px var(--danger)' : 'none',
               }}
-              onClick={() => toggleComplete(d.id)}
             >
-              <Circle size={18} style={{ color: urgent ? 'var(--danger)' : 'var(--text-muted)' }} />
-              <div className="flex-1">
+              <div className="flex-1" onClick={() => toggleComplete(d.id)}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {TYPE_ICONS[d.bounty_type] || '📝'} {d.subject_name}
@@ -196,12 +200,19 @@ export const Deadlines: React.FC = () => {
                   {new Date(d.due_date).toLocaleDateString()} • {getTimeDisplay(d.due_date)}
                 </div>
               </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteDeadline(d.id); }}
+                className="p-1 rounded hover:bg-opacity-10 opacity-0 group-hover:opacity-100 transition"
+                style={{ color: 'var(--danger)' }}
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
           );
         })
       )}
 
-      {/* Quick Add Modal */}
+      {/* Add Modal */}
       {showAddModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"

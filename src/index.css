@@ -3,36 +3,101 @@
 @tailwind utilities;
 
 /* ============================================================
-   THEME VARIABLES (Default Theme - Warm Minimalist)
+   THEME VARIABLES (CSS Custom Properties)
    ============================================================ */
 :root {
-  /* Backgrounds */
+  /* Default Theme – Warm Minimalist */
   --bg: #F5F0E8;
   --surface: #EDE8DF;
   --card: #FFFFFF;
-
-  /* Text */
   --text-primary: #2C2520;
   --text-secondary: #6B5F54;
   --text-muted: #A89885;
-
-  /* Accent */
   --accent: #C97B5A;
   --accent-hover: #B06345;
   --accent-light: rgba(201, 123, 90, 0.15);
-
-  /* Status */
   --success: #7CA58C;
   --warning: #D4A74A;
   --danger: #C45A5A;
-
-  /* Borders & Shadows */
   --border: #DCD5C9;
   --shadow: rgba(44, 37, 32, 0.08);
-
-  /* Sticky Note (always yellow) */
   --sticky-bg: #FDFD96;
   --sticky-text: #2C2520;
+  --radius: 12px;
+  --font: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --bg: #FAF8F5;
+  --surface: #F5F2EC;
+  --card: #FFFFFF;
+  --text-primary: #1A1512;
+  --text-secondary: #5A4F44;
+  --text-muted: #9A8B7A;
+  --accent: #C97B5A;
+  --accent-hover: #B06345;
+  --accent-light: rgba(201, 123, 90, 0.12);
+  --success: #7CA58C;
+  --warning: #D4A74A;
+  --danger: #C45A5A;
+  --border: #E5DDD2;
+  --shadow: rgba(0, 0, 0, 0.06);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg: #1A1715;
+  --surface: #25211D;
+  --card: #2E2925;
+  --text-primary: #EDE8DF;
+  --text-secondary: #A89885;
+  --text-muted: #7D7263;
+  --accent: #C97B5A;
+  --accent-hover: #D48A69;
+  --accent-light: rgba(201, 123, 90, 0.2);
+  --success: #7CA58C;
+  --warning: #D4A74A;
+  --danger: #C45A5A;
+  --border: #3D3731;
+  --shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* OLED True Black Theme */
+[data-theme="oled"] {
+  --bg: #000000;
+  --surface: #0D0D0D;
+  --card: #141414;
+  --text-primary: #FFFFFF;
+  --text-secondary: #B0B0B0;
+  --text-muted: #808080;
+  --accent: #C97B5A;
+  --accent-hover: #D48A69;
+  --accent-light: rgba(201, 123, 90, 0.15);
+  --success: #7CA58C;
+  --warning: #D4A74A;
+  --danger: #C45A5A;
+  --border: #2A2A2A;
+  --shadow: rgba(0, 0, 0, 0.5);
+}
+
+/* Custom Theme – applied via inline styles on :root */
+[data-theme="custom"] {
+  /* Variables are set programmatically; we define fallbacks */
+  --bg: #F5F0E8;
+  --surface: #EDE8DF;
+  --card: #FFFFFF;
+  --text-primary: #2C2520;
+  --text-secondary: #6B5F54;
+  --text-muted: #A89885;
+  --accent: #C97B5A;
+  --accent-hover: #B06345;
+  --accent-light: rgba(201, 123, 90, 0.15);
+  --success: #7CA58C;
+  --warning: #D4A74A;
+  --danger: #C45A5A;
+  --border: #DCD5C9;
+  --shadow: rgba(44, 37, 32, 0.08);
 }
 
 /* ============================================================
@@ -41,12 +106,28 @@
 body {
   background-color: var(--bg);
   color: var(--text-primary);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font);
   margin: 0;
   padding: 0;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
-/* Smooth transitions for theme switching */
 * {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-hover);
 }
