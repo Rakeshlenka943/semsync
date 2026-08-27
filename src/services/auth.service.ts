@@ -5,40 +5,6 @@ import { parseRollNumber, buildBadge } from '../utils/rollNumberParser';
 export type AuthCredentials = { username?: string; rollNumber?: string; password: string };
 export type SignUpData = { username: string; rollNumber: string; password: string; academicCycle: 'physics' | 'chemistry' | null; email: string };
 
-// Helper: Send welcome email via Resend
-async function sendWelcomeEmail(email: string, username: string, rollNumber: string) {
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: 'SemSync <onboarding@resend.dev>',
-        to: email,
-        subject: 'Welcome to SemSync! 🎉',
-        html: `
-          <h1>Welcome to SemSync, ${username}!</h1>
-          <p>Your account has been created successfully.</p>
-          <p><strong>Your Roll Number:</strong> ${rollNumber}</p>
-          <p><strong>Login Email:</strong> ${email}</p>
-          <p>You can now login using your roll number or email.</p>
-          <p>⚠️ Please keep your password safe. You can reset it anytime.</p>
-          <br>
-          <p>📚 <strong>SemSync</strong> - Your all-in-one student toolkit.</p>
-          <p>Track attendance, syllabus, deadlines & more.</p>
-        `,
-      }),
-    });
-    if (!response.ok) {
-      console.error('Failed to send welcome email:', await response.text());
-    }
-  } catch (error) {
-    console.error('Error sending welcome email:', error);
-  }
-}
-
 export async function signUp(data: SignUpData) {
   const { username, rollNumber, password, academicCycle, email } = data;
 
@@ -51,6 +17,7 @@ export async function signUp(data: SignUpData) {
 
   const authEmail = email || `${rollNumber}@gmail.com`;
 
+  // 1. Create auth user – the trigger will insert the profile
   const { error: authError } = await supabase.auth.signUp({
     email: authEmail,
     password,
@@ -69,31 +36,20 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: authError };
   }
 
-  const { data: userData, error: insertError } = await supabase
+  // 2. Fetch the newly created profile (trigger should have created it)
+  // Wait a moment for the trigger to run
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const { data: userData, error: fetchError } = await supabase
     .from('users')
-    .insert({
-      roll_number: rollNumber,
-      username,
-      email: authEmail,
-      batch_badge: buildBadge(username, batchBadge),
-      academic_cycle: academicCycle,
-      tier: 'free',
-      sticky_note_content: '',
-      theme_config: { base: 'dark', accent: '#00d4ff' },
-      faculty_vote_ledger: {},
-      agreed_to_whisper: false,
-      attendance_target: 75,
-    })
-    .select()
+    .select('*')
+    .eq('roll_number', rollNumber)
     .single();
 
-  if (insertError) {
-    console.error('Profile insert error:', insertError);
-    return { user: null, error: insertError };
+  if (fetchError) {
+    console.error('Fetch profile error:', fetchError);
+    return { user: null, error: new Error('Profile creation failed. Please try logging in.') };
   }
-
-  // Send welcome email (async)
-  sendWelcomeEmail(authEmail, username, rollNumber);
 
   return { user: userData as User, error: null };
 }
@@ -101,47 +57,33 @@ export async function signUp(data: SignUpData) {
 export async function signIn(credentials: AuthCredentials) {
   const { username, rollNumber, password } = credentials;
 
-  let authEmail: string | null = null;
-  let finalRollNumber: string | null = null;
+  let finalRollNumber = rollNumber;
+  let emailLookup: string | null = null;
 
-  // Case 1: Roll number provided
-  if (rollNumber) {
-    const { data, error } = await supabase
+  // Try to find the user by roll number or username/email
+  if (!finalRollNumber && username) {
+    const { data } = await supabase
       .from('users')
-      .select('email, roll_number')
-      .eq('roll_number', rollNumber)
-      .single();
-
-    if (error || !data) {
-      return { user: null, error: new Error('User not found with this roll number') };
-    }
-    authEmail = data.email;
-    finalRollNumber = data.roll_number;
-  }
-  // Case 2: Username or email provided
-  else if (username) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('email, roll_number')
+      .select('roll_number, email')
       .or(`username.eq.${username},email.eq.${username}`);
 
-    if (error || !data || data.length === 0) {
+    if (!data || data.length === 0) {
       return { user: null, error: new Error('User not found') };
     }
     if (data.length > 1) {
       return { user: null, error: null, needsRollNumber: true };
     }
-    authEmail = data[0].email;
     finalRollNumber = data[0].roll_number;
-  } else {
-    return { user: null, error: new Error('Please provide username, email, or roll number') };
+    emailLookup = data[0].email;
   }
 
-  if (!authEmail || !finalRollNumber) {
-    return { user: null, error: new Error('User data missing') };
+  if (!finalRollNumber) {
+    return { user: null, error: new Error('No roll number provided') };
   }
 
-  // Authenticate with the actual email
+  // Use email from lookup or build from roll number
+  const authEmail = emailLookup || `${finalRollNumber}@gmail.com`;
+
   const { error } = await supabase.auth.signInWithPassword({
     email: authEmail,
     password,
@@ -151,7 +93,6 @@ export async function signIn(credentials: AuthCredentials) {
     return { user: null, error };
   }
 
-  // Fetch full user profile
   const { data: userData, error: fetchError } = await supabase
     .from('users')
     .select('*')
@@ -189,16 +130,8 @@ export async function getCurrentUser() {
 
 // 🔑 Forgot Password - sends reset link directly via Supabase Auth
 export async function resetPassword(email: string) {
-  // Send password reset email via Supabase Auth
-  // Supabase will check if the email exists in auth.users
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'http://localhost:5173/reset-password',
+    redirectTo: 'https://semsync-theta.vercel.app/reset-password', // Change to your production URL
   });
-
-  if (error) {
-    console.error('Reset password error:', error);
-    return { error };
-  }
-
-  return { error: null };
+  return { error };
 }
