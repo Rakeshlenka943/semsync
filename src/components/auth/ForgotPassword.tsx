@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { resetPassword } from '../../services/auth.service';
+import { ArrowLeft } from 'lucide-react';
 
 interface ForgotPasswordProps {
   onBack: () => void;
@@ -53,6 +54,9 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
 
   return (
     <div className="p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--card)' }}>
+      <button onClick={onBack} className="flex items-center gap-1 text-sm mb-4 hover:underline" style={{ color: 'var(--text-muted)' }}>
+        <ArrowLeft size={16} /> Back
+      </button>
       <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Forgot Password</h2>
       <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
         Enter your email address and we'll send you a link to reset your password.
@@ -82,14 +86,6 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
           style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
         >
           {isLoading ? 'Sending...' : 'Send Reset Link'}
-        </button>
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full mt-2 text-sm hover:underline"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Back to Login
         </button>
       </form>
     </div>

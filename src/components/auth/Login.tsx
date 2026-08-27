@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onForgotPassword: () => void;
@@ -11,6 +12,10 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Optional: visual gibberish for password display
+  const [gibberishMode, setGibberishMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +35,9 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
     }
     setIsLoading(false);
   };
+
+  // Toggle between plain text and gibberish
+  const toggleShow = () => setShowPassword(!showPassword);
 
   return (
     <div className="p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--card)' }}>
@@ -53,28 +61,54 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
             required
             placeholder="username, email, or roll number"
           />
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            You can login with your username, email, or roll number.
-          </p>
         </div>
+
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
             Password
           </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: 'var(--bg)',
-              borderColor: 'var(--border)',
-              color: 'var(--text-primary)',
-              '--tw-ring-color': 'var(--accent)',
-            }}
-            required
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 pr-10"
+              style={{
+                backgroundColor: 'var(--bg)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-primary)',
+                '--tw-ring-color': 'var(--accent)',
+              }}
+              required
+              placeholder={showPassword ? (gibberishMode ? '• • • • • •' : 'Enter password') : 'Enter password'}
+            />
+            <button
+              type="button"
+              onClick={toggleShow}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {showPassword ? 'Password visible' : 'Password hidden'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setGibberishMode(!gibberishMode)}
+              className="text-xs underline hover:opacity-70"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {gibberishMode ? 'Show real chars' : 'Show gibberish'}
+            </button>
+          </div>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+            Click the eye to toggle visibility.
+          </p>
         </div>
+
         <div className="text-right mb-4">
           <button
             type="button"
@@ -85,7 +119,9 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
             Forgot Password?
           </button>
         </div>
+
         {error && <div className="text-sm mb-2" style={{ color: 'var(--danger)' }}>{error}</div>}
+
         <button
           type="submit"
           disabled={isLoading}

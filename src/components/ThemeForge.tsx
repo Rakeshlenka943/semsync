@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useTheme, ThemePreset, CustomColors } from '../contexts/ThemeContext';
-import { ArrowLeft, Check, Palette, Moon, Sun, Monitor, Droplet, Paintbrush } from 'lucide-react';
+import type { ThemePreset, CustomColors } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { ArrowLeft, Check, Palette, Moon, Sun, Monitor, Paintbrush } from 'lucide-react';
 
 interface ThemeForgeProps {
   onBack: () => void;
 }
 
 const PRESETS: { id: ThemePreset; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'default', label: 'Default', icon: <Palette size={20} />, description: 'Warm, minimalist, natural' },
+  { id: 'default', label: 'Default', icon: <Palette size={20} />, description: 'Nature & calm' },
   { id: 'light', label: 'Light', icon: <Sun size={20} />, description: 'Bright, clean, energetic' },
-  { id: 'dark', label: 'Dark', icon: <Moon size={20} />, description: 'Calm, low blue light, focused' },
+  { id: 'dark', label: 'Dark', icon: <Moon size={20} />, description: 'Warm, low blue light' },
   { id: 'oled', label: 'OLED Black', icon: <Monitor size={20} />, description: 'True black, saves battery' },
   { id: 'custom', label: 'Custom', icon: <Paintbrush size={20} />, description: 'Your own colours' },
 ];
 
-// Default custom colours
 const DEFAULT_CUSTOM: CustomColors = {
   bg: '#F5F0E8',
   surface: '#EDE8DF',
@@ -28,36 +28,13 @@ const DEFAULT_CUSTOM: CustomColors = {
 export const ThemeForge: React.FC<ThemeForgeProps> = ({ onBack }) => {
   const { theme, setTheme, customColors, setCustomColors } = useTheme();
   const [localCustom, setLocalCustom] = useState<CustomColors>(customColors || DEFAULT_CUSTOM);
-  const [previewTheme, setPreviewTheme] = useState<ThemePreset>('default');
 
-  // When switching to custom, load saved custom colours
-  useEffect(() => {
-    if (theme === 'custom' && customColors) {
-      setLocalCustom(customColors);
-    }
-  }, [theme, customColors]);
-
-  const applyPreset = (preset: ThemePreset) => {
-    setTheme(preset);
-    if (preset === 'custom' && customColors) {
-      // already applied
-    }
-  };
-
-  const applyCustom = () => {
-    setCustomColors(localCustom);
-    setTheme('custom');
-  };
-
-  const resetCustom = () => {
-    setLocalCustom(DEFAULT_CUSTOM);
-    setCustomColors(DEFAULT_CUSTOM);
-    setTheme('default');
-  };
+  const applyPreset = (preset: ThemePreset) => setTheme(preset);
+  const applyCustom = () => { setCustomColors(localCustom); setTheme('custom'); };
+  const resetCustom = () => { setLocalCustom(DEFAULT_CUSTOM); setCustomColors(DEFAULT_CUSTOM); setTheme('default'); };
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
           <ArrowLeft size={24} />
@@ -65,7 +42,6 @@ export const ThemeForge: React.FC<ThemeForgeProps> = ({ onBack }) => {
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>🎨 Theme Forge</h1>
       </div>
 
-      {/* Presets */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
         {PRESETS.map((preset) => {
           const isActive = theme === preset.id;
@@ -91,7 +67,6 @@ export const ThemeForge: React.FC<ThemeForgeProps> = ({ onBack }) => {
         })}
       </div>
 
-      {/* Custom Theme Editor */}
       {theme === 'custom' && (
         <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
           <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>🎨 Custom Colours</h3>
@@ -130,46 +105,19 @@ export const ThemeForge: React.FC<ThemeForgeProps> = ({ onBack }) => {
             ))}
           </div>
           <div className="flex gap-3 mt-4">
-            <button
-              onClick={applyCustom}
-              className="px-4 py-2 rounded text-sm font-medium"
-              style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
-            >
-              Apply Custom Theme
-            </button>
-            <button
-              onClick={resetCustom}
-              className="px-4 py-2 rounded text-sm font-medium"
-              style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-            >
-              Reset to Default
-            </button>
-          </div>
-          <div className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-            💡 Tip: Use a colour picker tool or hex code to fine‑tune your theme.
+            <button onClick={applyCustom} className="px-4 py-2 rounded text-sm font-medium" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>Apply Custom Theme</button>
+            <button onClick={resetCustom} className="px-4 py-2 rounded text-sm font-medium" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>Reset to Default</button>
           </div>
         </div>
       )}
 
-      {/* Preview Area */}
       <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
         <h3 className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>👁️ Live Preview</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div className="p-3 rounded" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>
-            Background
-          </div>
-          <div className="p-3 rounded" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)' }}>
-            Surface
-          </div>
-          <div className="p-3 rounded" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
-            Card
-          </div>
-          <div className="p-3 rounded flex items-center justify-center" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
-            Accent
-          </div>
-        </div>
-        <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-          Your theme changes instantly across all modules.
+          <div className="p-3 rounded" style={{ backgroundColor: 'var(--bg)', color: 'var(--text-primary)' }}>Background</div>
+          <div className="p-3 rounded" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)' }}>Surface</div>
+          <div className="p-3 rounded" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>Card</div>
+          <div className="p-3 rounded flex items-center justify-center" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>Accent</div>
         </div>
       </div>
     </div>

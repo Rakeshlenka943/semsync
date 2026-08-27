@@ -6,28 +6,28 @@
    THEME VARIABLES (CSS Custom Properties)
    ============================================================ */
 :root {
-  /* Default Theme – Warm Minimalist */
-  --bg: #F5F0E8;
-  --surface: #EDE8DF;
+  /* Default Theme – Nature & Calm */
+  --bg: #E8EDE6;
+  --surface: #F5F2EC;
   --card: #FFFFFF;
-  --text-primary: #2C2520;
-  --text-secondary: #6B5F54;
-  --text-muted: #A89885;
+  --text-primary: #1A2E1A;
+  --text-secondary: #5A6B5A;
+  --text-muted: #8A9B8A;
   --accent: #C97B5A;
   --accent-hover: #B06345;
   --accent-light: rgba(201, 123, 90, 0.15);
   --success: #7CA58C;
   --warning: #D4A74A;
   --danger: #C45A5A;
-  --border: #DCD5C9;
-  --shadow: rgba(44, 37, 32, 0.08);
+  --border: #D8DFD4;
+  --shadow: rgba(26, 46, 26, 0.08);
   --sticky-bg: #FDFD96;
   --sticky-text: #2C2520;
   --radius: 12px;
   --font: system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Light Theme */
+/* Light Theme – Clean & Bright */
 [data-theme="light"] {
   --bg: #FAF8F5;
   --surface: #F5F2EC;
@@ -45,7 +45,7 @@
   --shadow: rgba(0, 0, 0, 0.06);
 }
 
-/* Dark Theme */
+/* Dark Theme – Warm & Focused */
 [data-theme="dark"] {
   --bg: #1A1715;
   --surface: #25211D;
@@ -63,7 +63,7 @@
   --shadow: rgba(0, 0, 0, 0.3);
 }
 
-/* OLED True Black Theme */
+/* OLED True Black Theme – Minimal & Battery-Saving */
 [data-theme="oled"] {
   --bg: #000000;
   --surface: #0D0D0D;
@@ -81,9 +81,8 @@
   --shadow: rgba(0, 0, 0, 0.5);
 }
 
-/* Custom Theme – applied via inline styles on :root */
+/* Custom Theme – User-Defined (fallbacks) */
 [data-theme="custom"] {
-  /* Variables are set programmatically; we define fallbacks */
   --bg: #F5F0E8;
   --surface: #EDE8DF;
   --card: #FFFFFF;
@@ -116,7 +115,7 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Scrollbar styling */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

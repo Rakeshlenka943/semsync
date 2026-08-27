@@ -264,13 +264,13 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
               onDragStart={() => { if (isEditing) setDragSubject(subj); }}
               className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-default opacity-60'}`}
               style={{
-                backgroundColor: dragSubject?.code === subj.code ? '#4caf50' : '#e8f5e9',
+                backgroundColor: dragSubject?.code === subj.code ? 'var(--accent)' : 'var(--surface)',
                 color: dragSubject?.code === subj.code ? '#fff' : 'var(--text-primary)',
-                border: dragSubject?.code === subj.code ? 'none' : '2px dashed #4caf50',
+                border: dragSubject?.code === subj.code ? 'none' : '2px dashed var(--accent)',
               }}
             >
               <span className="font-medium">{subj.code}</span>
-              <span className="text-xs" style={{ color: '#4caf50' }}>🧪 3h</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>🧪 3h</span>
               {dragSubject?.code === subj.code && <Check size={14} />}
             </div>
           ))}
@@ -285,20 +285,13 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
         )}
       </div>
 
-      {/* Timetable Grid with fixed layout */}
       <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--border)' }}>
-        <table className="w-full border-collapse text-sm" style={{ tableLayout: 'fixed', backgroundColor: 'var(--bg)', minWidth: '700px' }}>
-          <colgroup>
-            <col style={{ width: '80px' }} />
-            {HOURS.map((_, i) => (
-              <col key={i} style={{ width: `calc((100% - 80px) / ${HOURS.length})` }} />
-            ))}
-          </colgroup>
+        <table className="w-full border-collapse text-sm" style={{ backgroundColor: 'var(--bg)', minWidth: '700px' }}>
           <thead>
             <tr>
-              <th className="p-2 font-semibold text-center" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>Day / Time</th>
+              <th className="p-2 font-semibold text-center" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', minWidth: '80px' }}>Day / Time</th>
               {HOURS.map((hour) => (
-                <th key={hour} className="p-2 text-center font-medium" style={{ color: hour >= LUNCH_START && hour < LUNCH_END ? 'var(--warning)' : 'var(--text-primary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <th key={hour} className="p-2 text-center font-medium" style={{ color: hour >= LUNCH_START && hour < LUNCH_END ? 'var(--warning)' : 'var(--text-primary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', minWidth: '60px' }}>
                   {formatHour(hour)}
                   {hour >= LUNCH_START && hour < LUNCH_END && ' 🍽️'}
                 </th>
@@ -318,14 +311,23 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
                     const isInsideSlot = slot && slot.start_hour < hour && slot.end_hour > hour;
                     const isDragTarget = dragSubject && !slot && !isLunch && isEditing;
 
-                    if (isInsideSlot) return null; // cell is merged by colSpan
+                    if (isInsideSlot) return null;
 
                     if (isStartOfSlot) {
                       const duration = slot.end_hour - slot.start_hour;
                       return (
                         <td key={`${day}-${hour}`} colSpan={duration} className="p-0" style={{ border: '1px solid var(--border)' }}>
-                          <div className="h-full w-full rounded p-1.5 flex flex-col justify-between animate-slide-in" style={{ backgroundColor: slot.is_lab ? '#e8f5e9' : 'var(--accent-light)', borderLeft: `4px solid ${slot.is_lab ? '#4caf50' : 'var(--accent)'}`, minHeight: '60px', height: '100%' }}>
-                            <div className="font-medium text-xs flex items-center gap-1">{slot.subject_code}{slot.is_lab && <span className="text-[10px]">🧪</span>}</div>
+                          <div className="h-full w-full rounded p-1.5 flex flex-col justify-between animate-slide-in" style={{
+                            backgroundColor: slot.is_lab ? 'var(--surface)' : 'var(--accent-light)',
+                            borderLeft: `4px solid ${slot.is_lab ? 'var(--accent)' : 'var(--accent)'}`,
+                            minHeight: '60px',
+                            height: '100%',
+                            color: 'var(--text-primary)',
+                          }}>
+                            <div className="font-medium text-xs flex items-center gap-1">
+                              {slot.subject_code}
+                              {slot.is_lab && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>🧪</span>}
+                            </div>
                             {isEditing && <button onClick={() => removeSlot(slot)} className="self-end p-0.5 rounded hover:bg-opacity-20" style={{ color: 'var(--danger)' }}><X size={12} /></button>}
                           </div>
                         </td>
@@ -342,7 +344,7 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
                           border: '1px solid var(--border)',
                           backgroundColor: isLunch ? 'rgba(212, 167, 74, 0.12)' : (isDragTarget ? 'rgba(76, 175, 80, 0.15)' : 'var(--card)'),
                           height: '60px',
-                          outline: isDragTarget ? '2px dashed #4caf50' : 'none',
+                          outline: isDragTarget ? '2px dashed var(--accent)' : 'none',
                         }}
                       >
                         {isLunch ? <span className="text-sm" style={{ color: 'var(--text-muted)' }}>🍽️</span> : isEditing && dragSubject ? <span className="text-xs" style={{ color: 'var(--text-muted)' }}>+</span> : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>·</span>}
@@ -357,8 +359,8 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
       </div>
 
       <div className="mt-4 text-xs flex flex-wrap gap-3" style={{ color: 'var(--text-secondary)' }}>
-        <span>🟦 Theory (1h)</span>
-        <span>🟩 Labs (3h)</span>
+        <span style={{ color: 'var(--text-primary)' }}>🟦 Theory (1h)</span>
+        <span style={{ color: 'var(--text-primary)' }}>🟩 Labs (3h)</span>
         <span>🍽️ Lunch (1-2pm)</span>
         <span>⏰ 9am–5pm</span>
         {isEditing && <span className="text-xs" style={{ color: 'var(--warning)' }}>✏️ Drag to add, X to remove</span>}

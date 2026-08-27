@@ -10,9 +10,9 @@ interface AlertBannerProps {
 
 export const AlertBanner: React.FC<AlertBannerProps> = ({ type, message, urgency, onDismiss }) => {
   const colors = {
-    info: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
-    warning: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300' },
-    danger: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+    info: { bg: 'rgba(33, 150, 243, 0.15)', text: '#2196f3', border: '#2196f3' },
+    warning: { bg: 'rgba(212, 167, 74, 0.15)', text: 'var(--warning)', border: 'var(--warning)' },
+    danger: { bg: 'rgba(196, 90, 90, 0.15)', text: 'var(--danger)', border: 'var(--danger)' },
   };
 
   const icons = {
@@ -22,11 +22,20 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ type, message, urgency
   };
 
   return (
-    <div className={`mx-4 my-2 p-3 rounded-lg border flex items-start gap-3 ${colors[urgency].bg} ${colors[urgency].border} ${colors[urgency].text}`}>
+    <div
+      className="mx-4 my-2 p-3 rounded-lg border flex items-start gap-3"
+      style={{
+        backgroundColor: colors[urgency].bg,
+        borderColor: colors[urgency].border,
+        color: colors[urgency].text,
+      }}
+    >
       <div className="flex-shrink-0 mt-0.5">{icons[type]}</div>
       <p className="flex-1 text-sm">{message}</p>
       {onDismiss && (
-        <button onClick={onDismiss} className="text-sm font-medium hover:underline">Dismiss</button>
+        <button onClick={onDismiss} className="text-sm font-medium hover:underline" style={{ color: colors[urgency].text }}>
+          Dismiss
+        </button>
       )}
     </div>
   );

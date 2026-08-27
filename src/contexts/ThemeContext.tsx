@@ -20,23 +20,12 @@ interface ThemeContextType {
   applyCustomTheme: (colors: CustomColors) => void;
 }
 
-const defaultCustom: CustomColors = {
-  bg: '#F5F0E8',
-  surface: '#EDE8DF',
-  card: '#FFFFFF',
-  textPrimary: '#2C2520',
-  textSecondary: '#6B5F54',
-  accent: '#C97B5A',
-  border: '#DCD5C9',
-};
-
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<ThemePreset>('default');
   const [customColors, setCustomColors] = useState<CustomColors | null>(null);
 
-  // Load saved theme from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('semsync-theme');
     if (saved) {
@@ -48,7 +37,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Apply theme to document root
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
@@ -69,17 +57,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.style.setProperty('--border', colors.border);
     root.style.setProperty('--accent-hover', colors.accent);
     root.style.setProperty('--accent-light', colors.accent + '33');
-    // For success/warning/danger we keep defaults or could be custom too
   };
 
   const value = {
     theme,
     setTheme,
     customColors,
-    setCustomColors: (colors: CustomColors) => {
-      setCustomColors(colors);
-      applyCustomTheme(colors);
-    },
+    setCustomColors,
     applyCustomTheme,
   };
 

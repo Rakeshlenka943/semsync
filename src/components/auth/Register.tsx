@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseRollNumber } from '../../utils/rollNumberParser';
+import { Eye, EyeOff } from 'lucide-react';
 
 export const Register: React.FC = () => {
   const { register } = useAuth();
@@ -13,6 +14,8 @@ export const Register: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [batchBadge, setBatchBadge] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleRollNumberChange = (value: string) => {
     setRollNumber(value);
@@ -93,9 +96,6 @@ export const Register: React.FC = () => {
             required
             placeholder="your.email@example.com"
           />
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-            We'll send you a welcome email and password reset links here.
-          </p>
         </div>
 
         <div className="mb-4">
@@ -139,35 +139,55 @@ export const Register: React.FC = () => {
 
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: 'var(--bg)',
-              borderColor: 'var(--border)',
-              color: 'var(--text-primary)',
-            }}
-            required
-            minLength={6}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 pr-10"
+              style={{
+                backgroundColor: 'var(--bg)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-primary)',
+              }}
+              required
+              minLength={6}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm Password</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: 'var(--bg)',
-              borderColor: 'var(--border)',
-              color: 'var(--text-primary)',
-            }}
-            required
-          />
+          <div className="relative">
+            <input
+              type={showConfirm ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 pr-10"
+              style={{
+                backgroundColor: 'var(--bg)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-primary)',
+              }}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm(!showConfirm)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
         {error && <div className="text-sm mb-2" style={{ color: 'var(--danger)' }}>{error}</div>}
