@@ -14,15 +14,15 @@ interface TimetableSlot {
 }
 
 interface AttendanceLog {
-  slot_id: string;
+  user_roll: string;
+  subject_code: string;
   log_date: string;
-  status: string;
+  status: 'present' | 'absent' | 'teacher_absent' | 'proxy' | 'holiday';
 }
 
-// Helper to get day of week (1=Mon, 5=Fri)
 function getDayOfWeek(): number {
   const d = new Date().getDay();
-  return d === 0 ? 7 : d; // Sun=7, Mon=1, ... Sat=6
+  return d === 0 ? 7 : d;
 }
 
 function calculateDangerZone(attended: number, total: number, target: number) {
@@ -40,28 +40,24 @@ function calculateDangerZone(attended: number, total: number, target: number) {
 export const DailyGlide: React.FC = () => {
   const { user } = useAuth();
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
-  const [logs, setLogs] = useState<Map<string, string>>(new Map());
+  const [todayLogs, setTodayLogs] = useState<Map<string, string>>(new Map());
+  const [subjectStats, setSubjectStats] = useState<Map<string, { total: number; attended: number }>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchToday = async () => {
       if (!user) return;
-      
-      const today = getDayOfWeek();
-      // Only show Mon-Fri
-      if (today < 1 || today > 5) {
-        setSlots([]);
-        setLoading(false);
-        return;
-      }
 
-      // ✅ FIX: Only fetch active slots
+      const today = getDayOfWeek();
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // 1. Fetch ONLY active timetable slots for today
       const { data: slotsData, error: slotsError } = await supabase
         .from('timetable_slots')
         .select('*')
         .eq('user_roll', user.roll_number)
         .eq('day_of_week', today)
-        .eq('is_active', true)        // ✅ ADD THIS
+        .eq('is_active', true)   // ✅ Filter active
         .order('start_time');
 
       if (slotsError) {
@@ -70,40 +66,50 @@ export const DailyGlide: React.FC = () => {
         return;
       }
 
-      // Deduplicate by slot ID (just in case)
-      const uniqueSlots = slotsData ? Array.from(
-        new Map(slotsData.map(s => [s.id, s])).values()
-      ) : [];
+      // 2. Deduplicate by subject_code to avoid duplicates
+      const uniqueSlots = slotsData
+        ? Array.from(new Map(slotsData.map(s => [s.subject_code, s])).values())
+        : [];
       setSlots(uniqueSlots);
 
-      // Fetch attendance logs for today
-      const todayStr = new Date().toISOString().split('T')[0];
-      const { data: logsData, error: logsError } = await supabase
+      // 3. Fetch all attendance logs
+      const { data: allLogs, error: logsError } = await supabase
         .from('attendance_logs')
-        .select('slot_id, status')
-        .eq('user_roll', user.roll_number)
-        .eq('log_date', todayStr);
+        .select('*')
+        .eq('user_roll', user.roll_number);
 
-      if (!logsError && logsData) {
-        const logMap = new Map<string, string>();
-        logsData.forEach(log => logMap.set(log.slot_id, log.status));
-        setLogs(logMap);
+      if (logsError) {
+        console.error('Error fetching logs:', logsError);
+        setLoading(false);
+        return;
       }
 
+      // 4. Compute stats per subject
+      const statsMap = new Map<string, { total: number; attended: number }>();
+      const todayMap = new Map<string, string>();
+
+      if (allLogs) {
+        allLogs.forEach((log: AttendanceLog) => {
+          const { subject_code, log_date, status } = log;
+          if (log_date === todayStr) {
+            todayMap.set(subject_code, status);
+          }
+          if (status === 'holiday' || status === 'teacher_absent') return;
+          const isAttended = status === 'present' || status === 'proxy';
+          const entry = statsMap.get(subject_code) || { total: 0, attended: 0 };
+          entry.total += 1;
+          if (isAttended) entry.attended += 1;
+          statsMap.set(subject_code, entry);
+        });
+      }
+
+      setSubjectStats(statsMap);
+      setTodayLogs(todayMap);
       setLoading(false);
     };
 
     fetchToday();
   }, [user]);
-
-  // Compute attendance stats
-  const getAttendanceStats = (slotId: string): { attended: number; total: number; percentage: number } => {
-    // For demo, we'll use dummy data – in production, fetch from attendance_logs per subject
-    // Since we don't have per-subject tracking, we'll use overall attendance
-    const total = 6; // dummy
-    const attended = 5; // dummy
-    return { attended, total, percentage: Math.round((attended / total) * 100) };
-  };
 
   if (loading) {
     return <div className="p-4 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>Loading today's classes...</div>;
@@ -123,15 +129,19 @@ export const DailyGlide: React.FC = () => {
     <div className="space-y-3 p-4">
       <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>📅 Today's Classes</h2>
       {slots.map((slot) => {
-        const status = logs.get(slot.id) || 'present';
+        const status = todayLogs.get(slot.subject_code) || 'present';
         const isHoliday = status === 'holiday';
-        const { attended, total, percentage } = getAttendanceStats(slot.id);
+
+        const stats = subjectStats.get(slot.subject_code) || { total: 0, attended: 0 };
+        const { total, attended } = stats;
+        const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
+
         const danger = calculateDangerZone(attended, total, target);
 
         return (
           <div
             key={slot.id}
-            className={`rounded-lg border p-4 transition-all`}
+            className="rounded-lg border p-4 transition-all"
             style={{
               backgroundColor: 'var(--card)',
               borderColor: 'var(--border)',
@@ -162,9 +172,14 @@ export const DailyGlide: React.FC = () => {
                     Target: {target}%
                   </span>
                 </div>
-                {!isHoliday && (
+                {!isHoliday && total > 0 && (
                   <div className="mt-1 text-sm font-medium" style={{ color: danger.status === 'safe' ? 'var(--success)' : 'var(--danger)' }}>
                     {danger.message}
+                  </div>
+                )}
+                {total === 0 && (
+                  <div className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    No attendance data yet.
                   </div>
                 )}
               </div>

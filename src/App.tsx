@@ -9,6 +9,9 @@ import { Dashboard } from './components/Dashboard';
 import { TimetableBuilder } from './components/TimetableBuilder';
 import { MonthlyHeatmap } from './components/MonthlyHeatmap';
 import { SemesterDates } from './components/SemesterDates';
+import { SyllabusTracker } from './components/SyllabusTracker';
+import { DeadlinesManager } from './components/DeadlinesManager';
+import { GlobalNav } from './components/GlobalNav';
 
 type Page = 'dashboard' | 'timetable' | 'heatmap' | 'syllabus' | 'deadlines' | 'exams' | 'semester' | 'whisper' | 'theme' | 'settings';
 
@@ -33,9 +36,7 @@ function AppContent() {
   if (showResetPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
-        <ResetPassword onSuccess={() => {
-          setShowResetPassword(false);
-        }} />
+        <ResetPassword onSuccess={() => setShowResetPassword(false)} />
       </div>
     );
   }
@@ -44,10 +45,7 @@ function AppContent() {
     if (showForgotPassword) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
-          <ForgotPassword 
-            onBack={() => setShowForgotPassword(false)}
-            onSuccess={() => setShowForgotPassword(false)}
-          />
+          <ForgotPassword onBack={() => setShowForgotPassword(false)} onSuccess={() => setShowForgotPassword(false)} />
         </div>
       );
     }
@@ -82,7 +80,6 @@ function AppContent() {
     );
   }
 
-  // Render based on current page
   const renderPage = () => {
     switch (currentPage) {
       case 'timetable':
@@ -91,7 +88,10 @@ function AppContent() {
         return <MonthlyHeatmap onBack={() => setCurrentPage('dashboard')} />;
       case 'semester':
         return <SemesterDates onBack={() => setCurrentPage('dashboard')} />;
-      // Other pages will be added later
+      case 'syllabus':
+        return <SyllabusTracker onBack={() => setCurrentPage('dashboard')} />;
+      case 'deadlines':
+        return <DeadlinesManager onBack={() => setCurrentPage('dashboard')} />;
       default:
         return <Dashboard onNavigate={setCurrentPage} />;
     }
@@ -99,7 +99,8 @@ function AppContent() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
-      {renderPage()}
+      <GlobalNav currentPage={currentPage} onNavigate={setCurrentPage} />
+      <div className="pt-2">{renderPage()}</div>
     </div>
   );
 }

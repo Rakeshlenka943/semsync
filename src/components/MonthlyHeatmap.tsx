@@ -23,9 +23,11 @@ interface TimetableSlot {
 }
 
 interface AttendanceLog {
-  slot_id: string;
+  user_roll: string;
+  subject_code: string;
   log_date: string;
   status: 'present' | 'absent' | 'teacher_absent' | 'proxy' | 'holiday';
+  context_note?: string;
 }
 
 interface SubjectAttendanceStats {
@@ -80,13 +82,13 @@ function getStatusColor(status: string): string {
 function getSubjectStatsUpToDate(
   subjectCode: string,
   allLogs: AttendanceLog[],
-  timetableSlots: TimetableSlot[],
-  upToDate: Date
+  upToDate: Date,
+  subjectName: string,
+  isLab: boolean
 ): SubjectAttendanceStats {
-  const subjectSlots = timetableSlots.filter(s => s.subject_code === subjectCode);
   const upToDateStr = getLocalDateStr(upToDate);
   const relevantLogs = allLogs.filter(log => {
-    return log.log_date <= upToDateStr && subjectSlots.some(s => s.id === log.slot_id);
+    return log.subject_code === subjectCode && log.log_date <= upToDateStr;
   });
 
   const stats = { present: 0, absent: 0, teacher_absent: 0, proxy: 0, holiday: 0 };
@@ -104,11 +106,10 @@ function getSubjectStatsUpToDate(
   const attended = stats.present + stats.proxy;
   const percentage = effectiveTotal > 0 ? (attended / effectiveTotal) * 100 : 0;
 
-  const slot = subjectSlots[0];
   return {
     subject_code: subjectCode,
-    subject_name: slot ? slot.subject_name : subjectCode,
-    is_lab: slot ? slot.is_lab : false,
+    subject_name: subjectName,
+    is_lab: isLab,
     total,
     present: stats.present,
     absent: stats.absent,
@@ -222,7 +223,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
   const [showExtraClassModal, setShowExtraClassModal] = useState(false);
   const [showMassHolidayModal, setShowMassHolidayModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState<{
-    action: 'all_absent' | 'clear_all' | 'delete_extra';
+    action: 'delete_extra';
     message: string;
     payload?: any;
   } | null>(null);
@@ -293,17 +294,17 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
   };
 
   // Action functions
-  const markSlot = async (slotId: string, date: Date, status: string) => {
+  const markSlot = async (subjectCode: string, date: Date, status: string) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     await supabase
       .from('attendance_logs')
       .upsert({
         user_roll: user.roll_number,
-        slot_id: slotId,
+        subject_code: subjectCode,
         log_date: dateStr,
         status,
-      }, { onConflict: 'user_roll, slot_id, log_date' });
+      }, { onConflict: 'user_roll, subject_code, log_date' });
     refreshLogs();
     setSelectedDay(date);
   };
@@ -316,15 +317,16 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         .from('attendance_logs')
         .upsert({
           user_roll: user.roll_number,
-          slot_id: cls.slot.id,
+          subject_code: cls.slot.subject_code,
           log_date: dateStr,
           status: 'holiday',
-        }, { onConflict: 'user_roll, slot_id, log_date' });
+        }, { onConflict: 'user_roll, subject_code, log_date' });
     }
     refreshLogs();
     setSelectedDay(date);
   };
 
+  // Bulk mark all slots for a day
   const markAll = async (date: Date, status: string) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -333,20 +335,29 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       (s.day_of_week === dayOfWeek && !s.specific_date) || 
       s.specific_date === dateStr
     );
-    for (const slot of daySlots) {
-      await supabase
-        .from('attendance_logs')
-        .upsert({
-          user_roll: user.roll_number,
-          slot_id: slot.id,
-          log_date: dateStr,
-          status,
-        }, { onConflict: 'user_roll, slot_id, log_date' });
+    if (daySlots.length === 0) {
+      alert('No classes found for this day.');
+      return;
+    }
+    const entries = daySlots.map(slot => ({
+      user_roll: user.roll_number,
+      subject_code: slot.subject_code,
+      log_date: dateStr,
+      status,
+    }));
+    const { error } = await supabase
+      .from('attendance_logs')
+      .upsert(entries, { onConflict: 'user_roll, subject_code, log_date' });
+    if (error) {
+      console.error('Bulk upsert error:', error);
+      alert('Failed to update attendance. Please try again.');
+      return;
     }
     refreshLogs();
     setSelectedDay(date);
   };
 
+  // Bulk clear all slots for a day
   const clearAll = async (date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -355,91 +366,98 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       (s.day_of_week === dayOfWeek && !s.specific_date) || 
       s.specific_date === dateStr
     );
-    for (const slot of daySlots) {
-      await supabase
-        .from('attendance_logs')
-        .delete()
-        .eq('user_roll', user.roll_number)
-        .eq('slot_id', slot.id)
-        .eq('log_date', dateStr);
+    if (daySlots.length === 0) {
+      alert('No classes found for this day.');
+      return;
+    }
+    const subjectCodes = daySlots.map(s => s.subject_code);
+    const { error } = await supabase
+      .from('attendance_logs')
+      .delete()
+      .eq('user_roll', user.roll_number)
+      .in('subject_code', subjectCodes)
+      .eq('log_date', dateStr);
+    if (error) {
+      console.error('Bulk delete error:', error);
+      alert('Failed to clear attendance. Please try again.');
+      return;
     }
     refreshLogs();
     setSelectedDay(date);
   };
 
-  // FAST BULK UPSERT MASS HOLIDAY
-  const handleMassHoliday = async (startDate: string, endDate: string) => {
-    if (!user) return;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  // Mass Holiday – direct bulk upsert
+  const handleMassHoliday = async () => {
+    if (!user || !holidayStartDate || !holidayEndDate) return;
+    const start = new Date(holidayStartDate);
+    const end = new Date(holidayEndDate);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       alert('Invalid date format.');
       return;
     }
     if (start > end) {
-      alert('Start date must be before end date.');
+      alert('Start date must be before or equal to end date.');
       return;
     }
-    const confirmMsg = `Mark ALL classes from ${start.toLocaleDateString()} to ${end.toLocaleDateString()} as HOLIDAY?`;
-    if (!window.confirm(confirmMsg)) return;
 
     setHolidayLoading(true);
-    try {
-      const entries: any[] = [];
-      const current = new Date(start);
-      while (current <= end) {
-        const dayOfWeek = current.getDay();
-        const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
-        const dateStr = getLocalDateStr(current);
-        for (const slot of daySlots) {
-          entries.push({
-            user_roll: user.roll_number,
-            slot_id: slot.id,
-            log_date: dateStr,
-            status: 'holiday',
-          });
-        }
-        current.setDate(current.getDate() + 1);
+    const entries: any[] = [];
+    const current = new Date(start);
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
+      const dateStr = getLocalDateStr(current);
+      for (const slot of daySlots) {
+        entries.push({
+          user_roll: user.roll_number,
+          subject_code: slot.subject_code,
+          log_date: dateStr,
+          status: 'holiday',
+        });
       }
+      current.setDate(current.getDate() + 1);
+    }
 
-      if (entries.length === 0) {
-        alert('No classes found in the selected date range.');
-        setShowMassHolidayModal(false);
-        setHolidayStartDate('');
-        setHolidayEndDate('');
-        setHolidayLoading(false);
-        return;
-      }
-
-      // Bulk upsert
-      const { error } = await supabase
-        .from('attendance_logs')
-        .upsert(entries, { onConflict: 'user_roll, slot_id, log_date' });
-
-      if (error) throw error;
-
-      await refreshLogs();
-      alert(`✅ ${entries.length} class(es) marked as holiday.`);
-    } catch (err) {
-      console.error(err);
-      alert('❌ Failed to mark holiday. Please try again.');
-    } finally {
+    if (entries.length === 0) {
+      alert('No classes found in the selected date range.');
       setHolidayLoading(false);
       setShowMassHolidayModal(false);
       setHolidayStartDate('');
       setHolidayEndDate('');
+      return;
     }
+
+    const { error } = await supabase
+      .from('attendance_logs')
+      .upsert(entries, { onConflict: 'user_roll, subject_code, log_date' });
+
+    if (error) {
+      console.error('Mass holiday error:', error);
+      alert('Failed to mark holiday. Please try again.');
+    } else {
+      await refreshLogs();
+      alert(`✅ ${entries.length} class(es) marked as holiday.`);
+    }
+
+    setHolidayLoading(false);
+    setShowMassHolidayModal(false);
+    setHolidayStartDate('');
+    setHolidayEndDate('');
   };
 
   const deleteExtraClass = async (slotId: string, date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
+    const slot = slots.find(s => s.id === slotId);
+    if (slot) {
+      await supabase
+        .from('attendance_logs')
+        .delete()
+        .eq('user_roll', user.roll_number)
+        .eq('subject_code', slot.subject_code)
+        .eq('log_date', dateStr);
+    }
     await supabase.from('timetable_slots').delete().eq('id', slotId);
-    await supabase
-      .from('attendance_logs')
-      .delete()
-      .eq('slot_id', slotId)
-      .eq('log_date', dateStr);
     await refreshSlots();
     refreshLogs();
     setSelectedDay(date);
@@ -457,10 +475,10 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         .from('attendance_logs')
         .upsert({
           user_roll: user.roll_number,
-          slot_id: existingSlot.id,
+          subject_code: subjectCode,
           log_date: dateStr,
           status: 'present',
-        }, { onConflict: 'user_roll, slot_id, log_date' });
+        }, { onConflict: 'user_roll, subject_code, log_date' });
       refreshLogs();
       setSelectedDay(date);
       setShowExtraClassModal(false);
@@ -489,20 +507,20 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setShowExtraClassModal(false);
   };
 
-  const clearSlot = async (slotId: string, date: Date) => {
+  const clearSlot = async (subjectCode: string, date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     await supabase
       .from('attendance_logs')
       .delete()
       .eq('user_roll', user.roll_number)
-      .eq('slot_id', slotId)
+      .eq('subject_code', subjectCode)
       .eq('log_date', dateStr);
     refreshLogs();
     setSelectedDay(date);
   };
 
-  // Build calendar (same as before)
+  // Build calendar
   const buildCalendar = (): any[][] => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
@@ -549,7 +567,10 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         );
         daySlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
         daySlots.forEach(slot => {
-          const log = allLogs.find(l => l.slot_id === slot.id && l.log_date === dateStr);
+          const log = allLogs.find(l => 
+            l.subject_code === slot.subject_code && 
+            l.log_date === dateStr
+          );
           dayClasses.push({
             slot,
             status: log ? log.status : 'no_data',
@@ -930,39 +951,32 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                         <Check size={12} /> All Present
                       </button>
                       <button
-                        onClick={() => {
-                          setShowConfirmModal({
-                            action: 'all_absent',
-                            message: `Are you sure you want to mark ALL classes on ${selectedDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} as ABSENT?`
-                          });
-                        }}
+                        onClick={() => markAll(selectedDay, 'absent')}
                         className="px-3 py-1 rounded text-xs font-medium hover:scale-105 transition flex items-center gap-1"
                         style={{ backgroundColor: 'var(--danger)', color: '#fff' }}
                       >
                         <XCircle size={12} /> All Absent
                       </button>
                       <button
-                        onClick={() => {
-                          setShowConfirmModal({
-                            action: 'clear_all',
-                            message: `Are you sure you want to REMOVE ALL STATUSES for ${selectedDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}?`
-                          });
-                        }}
+                        onClick={() => clearAll(selectedDay)}
                         className="px-3 py-1 rounded text-xs font-medium hover:scale-105 transition flex items-center gap-1"
                         style={{ backgroundColor: 'var(--text-muted)', color: '#fff' }}
                       >
                         <Trash2 size={12} /> Clear All
                       </button>
                     </div>
-                    <div className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      💡 All Present has no confirmation; All Absent & Clear All require confirmation
-                    </div>
                   </div>
 
                   {/* Subjects */}
                   {subjects.map((subject: any) => {
                     const isExpanded = expandedSubject === subject.code;
-                    const stats = getSubjectStatsUpToDate(subject.code, allLogs, slots, selectedDay);
+                    const stats = getSubjectStatsUpToDate(
+                      subject.code,
+                      allLogs,
+                      selectedDay,
+                      subject.slot.subject_name,
+                      subject.slot.is_lab
+                    );
                     const currentStatus = subject.status;
 
                     return (
@@ -1056,13 +1070,13 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                                     tooltip={optionTooltips[option] || ''}
                                     onClick={() => {
                                       if (isClear) {
-                                        clearSlot(subject.slot.id, selectedDay);
+                                        clearSlot(subject.code, selectedDay);
                                         return;
                                       }
                                       if (option === 'holiday') {
                                         markDayHoliday(selectedDay, dayData.classes);
                                       } else {
-                                        markSlot(subject.slot.id, selectedDay, option);
+                                        markSlot(subject.code, selectedDay, option);
                                       }
                                     }}
                                     style={{
@@ -1199,11 +1213,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    if (holidayStartDate && holidayEndDate) {
-                      handleMassHoliday(holidayStartDate, holidayEndDate);
-                    }
-                  }}
+                  onClick={handleMassHoliday}
                   disabled={!holidayStartDate || !holidayEndDate || holidayLoading}
                   className="flex-1 px-4 py-2 rounded text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-1"
                   style={{ backgroundColor: '#4caf50', color: '#fff' }}
@@ -1217,7 +1227,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Confirmation Modal (All Absent, Clear All, Delete Extra) */}
+      {/* Confirmation Modal */}
       {showConfirmModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1249,17 +1259,9 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
               <button
                 onClick={async () => {
                   if (!selectedDay) return;
-                  if (showConfirmModal.action === 'all_absent') {
-                    await markAll(selectedDay, 'absent');
-                    setShowConfirmModal(null);
-                  } else if (showConfirmModal.action === 'clear_all') {
-                    await clearAll(selectedDay);
-                    setShowConfirmModal(null);
-                  } else if (showConfirmModal.action === 'delete_extra') {
-                    const { slotId, date } = showConfirmModal.payload;
-                    await deleteExtraClass(slotId, date);
-                    setShowConfirmModal(null);
-                  }
+                  const { slotId, date } = showConfirmModal.payload;
+                  await deleteExtraClass(slotId, date);
+                  setShowConfirmModal(null);
                 }}
                 className="flex-1 px-4 py-2 rounded text-sm font-medium"
                 style={{ backgroundColor: 'var(--danger)', color: '#fff' }}
