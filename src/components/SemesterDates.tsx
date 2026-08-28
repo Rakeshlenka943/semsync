@@ -8,6 +8,11 @@ interface SemesterDatesProps {
   onBack: () => void;
 }
 
+// Helper: get local date string YYYY-MM-DD
+function getLocalDateStr(date: Date): string {
+  return date.toLocaleDateString('en-CA');
+}
+
 export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
   const { user } = useAuth();
   const [startDate, setStartDate] = useState<string>('');
@@ -50,6 +55,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
 
       if (!error && data) {
         if (data.semester_start) {
+          // Store as local date string
           setStartDate(data.semester_start);
           setOriginalStartDate(data.semester_start);
           setHasExisting(true);
@@ -121,6 +127,8 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
   const requestStartDateChange = () => {
     setShowStartDateChangeModal(true);
     setConfirmText('');
+    // Show the picker inside the modal by default
+    setShowStartPicker(true);
   };
 
   const confirmStartDateChange = async () => {
@@ -147,18 +155,21 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
       setSuccess(true);
       setOriginalStartDate(startDate);
       setShowStartDateChangeModal(false);
+      setShowStartPicker(false);
       setTimeout(() => setSuccess(false), 3000);
     }
     setSaving(false);
   };
 
   const handleStartDateSelect = (date: Date) => {
-    setStartDate(date.toISOString().split('T')[0]);
+    const localStr = getLocalDateStr(date);
+    setStartDate(localStr);
     setShowStartPicker(false);
   };
 
   const handleEndDateSelect = (date: Date) => {
-    setEndDate(date.toISOString().split('T')[0]);
+    const localStr = getLocalDateStr(date);
+    setEndDate(localStr);
     setShowEndPicker(false);
   };
 
@@ -235,7 +246,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
             >
               <span>
                 {startDate
-                  ? new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                   : 'Select start date'}
               </span>
               {!hasExisting && <Calendar size={18} style={{ color: 'var(--text-muted)' }} />}
@@ -244,7 +255,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
             {!hasExisting && showStartPicker && (
               <div className="absolute z-10 mt-1 left-0 w-full">
                 <CalendarPicker
-                  value={startDate ? new Date(startDate) : null}
+                  value={startDate ? new Date(startDate + 'T00:00:00') : null}
                   onChange={handleStartDateSelect}
                   onClose={() => setShowStartPicker(false)}
                 />
@@ -289,7 +300,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
             >
               <span>
                 {endDate
-                  ? new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  ? new Date(endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                   : 'Select end date'}
               </span>
               <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
@@ -297,7 +308,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
             {showEndPicker && (
               <div className="absolute z-10 mt-1 left-0 w-full">
                 <CalendarPicker
-                  value={endDate ? new Date(endDate) : null}
+                  value={endDate ? new Date(endDate + 'T00:00:00') : null}
                   onChange={handleEndDateSelect}
                   onClose={() => setShowEndPicker(false)}
                 />
@@ -351,8 +362,8 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
 
             <div className="p-4 rounded-lg mb-4" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
               <div className="space-y-2 text-sm">
-                <p>📅 <strong>Semester Start:</strong> {startDate ? new Date(startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set'}</p>
-                {endDate && <p>📅 <strong>Semester End:</strong> {new Date(endDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>}
+                <p>📅 <strong>Semester Start:</strong> {startDate ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set'}</p>
+                {endDate && <p>📅 <strong>Semester End:</strong> {new Date(endDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>}
               </div>
             </div>
 
@@ -420,7 +431,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
               <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
                 New Start Date
               </label>
-              <div className="relative">
+              <div className="relative" ref={startPickerRef}>
                 <button
                   onClick={() => setShowStartPicker(!showStartPicker)}
                   className="w-full px-3 py-2 border rounded-md text-left flex items-center justify-between"
@@ -432,7 +443,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
                 >
                   <span>
                     {startDate
-                      ? new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       : 'Select date'}
                   </span>
                   <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
@@ -440,7 +451,7 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
                 {showStartPicker && (
                   <div className="absolute z-10 mt-1 left-0 w-full">
                     <CalendarPicker
-                      value={startDate ? new Date(startDate) : null}
+                      value={startDate ? new Date(startDate + 'T00:00:00') : null}
                       onChange={handleStartDateSelect}
                       onClose={() => setShowStartPicker(false)}
                     />
