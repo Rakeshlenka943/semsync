@@ -14,6 +14,7 @@ interface Teacher {
 }
 
 interface Department {
+  id: string;
   name: string;
 }
 
@@ -21,7 +22,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   const { user } = useAuth();
   const [totalUsers, setTotalUsers] = useState(0);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [showAddDepartment, setShowAddDepartment] = useState(false);
@@ -49,12 +50,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       .order('name');
     setTeachers(teachersData || []);
 
-    // Fetch unique departments
+    // Fetch departments from departments table
     const { data: deptData } = await supabase
-      .from('faculty_profiles')
-      .select('department');
-    const uniqueDepts = Array.from(new Set(deptData?.map(d => d.department).filter(Boolean) || []));
-    setDepartments(uniqueDepts);
+      .from('departments')
+      .select('*')
+      .order('name');
+    setDepartments(deptData || []);
 
     setLoading(false);
   };
@@ -94,14 +95,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
   };
 
   const addDepartment = async () => {
-    if (!newDepartment) return;
-    // Departments are just strings in the faculty_profiles table
-    // We'll add a dummy teacher to create the department, or just update the list
-    // For now, we'll just add it to the list and allow teachers to use it
-    setDepartments(prev => [...prev, newDepartment]);
-    setNewDepartment('');
-    setShowAddDepartment(false);
-    alert('Department added! You can now assign teachers to it.');
+    if (!newDepartment) {
+      alert('Please enter a department name.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .insert({ name: newDepartment.trim() })
+        .select();
+      if (error) {
+        console.error('Error adding department:', error);
+        alert(`Failed to add department: ${error.message}`);
+        return;
+      }
+      console.log('Department added:', data);
+      setNewDepartment('');
+      setShowAddDepartment(false);
+      fetchData();
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      alert('An unexpected error occurred. Check console for details.');
+    }
+  };
+
+  const deleteDepartment = async (id: string) => {
+    // Check if any teachers use this department
+    const hasTeachers = teachers.some(t => t.department === departments.find(d => d.id === id)?.name);
+    if (hasTeachers) {
+      alert('Cannot delete department with assigned teachers. Reassign teachers first.');
+      return;
+    }
+    if (!window.confirm('Delete this department?')) return;
+    const { error } = await supabase
+      .from('departments')
+      .delete()
+      .eq('id', id);
+    if (!error) fetchData();
   };
 
   if (loading) {
@@ -152,6 +182,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
         >
           <Plus size={18} /> Add Department
         </button>
+      </div>
+
+      {/* Departments List */}
+      <div className="rounded-lg overflow-hidden mb-4" style={{ border: '1px solid var(--border)' }}>
+        <div className="p-3 font-semibold flex justify-between" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-primary)' }}>
+          <span>Departments ({departments.length})</span>
+        </div>
+        <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+          {departments.length === 0 ? (
+            <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>No departments added yet.</div>
+          ) : (
+            departments.map((d) => {
+              const hasTeachers = teachers.some(t => t.department === d.name);
+              return (
+                <div key={d.id} className="flex items-center justify-between p-3" style={{ backgroundColor: 'var(--card)' }}>
+                  <span style={{ color: 'var(--text-primary)' }}>{d.name}</span>
+                  <div className="flex items-center gap-2">
+                    {hasTeachers && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>({teachers.filter(t => t.department === d.name).length} teachers)</span>
+                    )}
+                    <button
+                      onClick={() => deleteDepartment(d.id)}
+                      disabled={hasTeachers}
+                      className="p-1 rounded hover:bg-opacity-10 disabled:opacity-30"
+                      style={{ color: 'var(--danger)' }}
+                      title={hasTeachers ? 'Cannot delete: department has teachers' : 'Delete department'}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Teachers List */}
@@ -212,7 +277,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 >
                   <option value="">Select department...</option>
                   {departments.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d.id} value={d.name}>{d.name}</option>
                   ))}
                   {departments.length === 0 && <option value="">No departments available. Add one first.</option>}
                 </select>

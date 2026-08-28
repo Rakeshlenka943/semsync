@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Search, Star, Info, ChevronRight, X, Check } from 'lucide-react';
+import { ArrowLeft, Search, Info, ChevronRight, X } from 'lucide-react';
 import { WhisperConsent } from './WhisperConsent';
 
 interface WhisperNetworkProps {
@@ -24,12 +24,6 @@ interface Faculty {
   lab_record_checking_votes: number;
   lab_marks_leniency_score: number;
   lab_marks_leniency_votes: number;
-}
-
-interface FacultyRating {
-  faculty_id: string;
-  category: string;
-  rating: number;
 }
 
 const CRITERIA = {
@@ -73,7 +67,6 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
       .single();
     if (!error && data) {
       if (data.agreed_to_whisper) {
-        // Check if agreement is still valid (e.g., within 180 days or same semester)
         const agreedAt = new Date(data.whisper_agreed_at);
         const now = new Date();
         const daysDiff = (now.getTime() - agreedAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -98,7 +91,6 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
       .order('name');
     if (!error && data) {
       setFaculty(data);
-      // Extract unique departments
       const depts = Array.from(new Set(data.map(f => f.department).filter(Boolean)));
       setAvailableDepartments(depts);
     }
@@ -142,26 +134,17 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
     if (!user) return;
     setRatingLoading(true);
 
-    // Build the ledger key
     const ledgerKey = `${facultyId}_${category}`;
-    const oldRating = userRatings.get(ledgerKey) || null;
-
-    // Call the RPC function (we'll create it later)
-    // For now, we'll simulate by calling a Supabase function or direct update
-    // We'll use a simple upsert with delta math via a custom RPC
     const { data, error } = await supabase.rpc('rate_faculty', {
-      p_user_roll: user.roll_number,
       p_faculty_id: facultyId,
       p_category: category,
       p_new_rating: value,
     });
 
     if (!error) {
-      // Update local state
       const newMap = new Map(userRatings);
       newMap.set(ledgerKey, value);
       setUserRatings(newMap);
-      // Refresh faculty list to update averages
       fetchFaculty();
     } else {
       console.error('Rating error:', error);
@@ -184,15 +167,12 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
 
   if (!hasAgreed) {
     return (
-      <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>
-        Loading...
-      </div>
+      <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>Loading...</div>
     );
   }
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
@@ -247,29 +227,44 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
       ) : (
         <div className="space-y-3">
           {filteredFaculty.map((f) => {
-            const theoryAvg = getAverage(f.theory_friendliness_score + f.theory_notes_score + f.theory_teaching_score, 
-                                         f.theory_friendliness_votes + f.theory_notes_votes + f.theory_teaching_votes);
-            const labAvg = getAverage(f.lab_strictness_score + f.lab_record_checking_score + f.lab_marks_leniency_score,
-                                      f.lab_strictness_votes + f.lab_record_checking_votes + f.lab_marks_leniency_votes);
-            const overallAvg = (theoryAvg + labAvg) / 2;
+            // Theory average
+            const theoryAvg = getAverage(
+              f.theory_friendliness_score + f.theory_notes_score + f.theory_teaching_score,
+              f.theory_friendliness_votes + f.theory_notes_votes + f.theory_teaching_votes
+            );
+            // Lab average
+            const labAvg = getAverage(
+              f.lab_strictness_score + f.lab_record_checking_score + f.lab_marks_leniency_score,
+              f.lab_strictness_votes + f.lab_record_checking_votes + f.lab_marks_leniency_votes
+            );
             return (
               <div
                 key={f.id}
-                className="rounded-lg border p-4 cursor-pointer hover:bg-opacity-5 transition flex items-center justify-between"
+                className="rounded-lg border p-4 cursor-pointer hover:bg-opacity-5 transition"
                 style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
                 onClick={() => setSelectedFaculty(f)}
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{f.name}</span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.department}</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{f.name}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.department}</span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-1 text-sm">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Theory:</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{getStarDisplay(theoryAvg)}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{theoryAvg.toFixed(1)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Lab:</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{getStarDisplay(labAvg)}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{labAvg.toFixed(1)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    <span>{getStarDisplay(overallAvg)}</span>
-                    <span>{overallAvg.toFixed(1)}</span>
-                  </div>
+                  <ChevronRight size={20} style={{ color: 'var(--text-muted)' }} />
                 </div>
-                <ChevronRight size={20} style={{ color: 'var(--text-muted)' }} />
               </div>
             );
           })}
