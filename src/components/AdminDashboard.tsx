@@ -64,17 +64,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
       alert('Please fill in all fields.');
       return;
     }
-    const { error } = await supabase
-      .from('faculty_profiles')
-      .insert({ name: newTeacher.name, department: newTeacher.department });
-    if (error) {
-      console.error('Error adding teacher:', error);
-      alert('Failed to add teacher.');
-      return;
+    try {
+      const { data, error } = await supabase
+        .from('faculty_profiles')
+        .insert({ name: newTeacher.name, department: newTeacher.department })
+        .select();
+      if (error) {
+        console.error('Error adding teacher:', error);
+        alert(`Failed to add teacher: ${error.message}`);
+        return;
+      }
+      console.log('Teacher added:', data);
+      setNewTeacher({ name: '', department: '' });
+      setShowAddTeacher(false);
+      fetchData();
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      alert('An unexpected error occurred. Check console for details.');
     }
-    setNewTeacher({ name: '', department: '' });
-    setShowAddTeacher(false);
-    fetchData();
   };
 
   const deleteTeacher = async (id: string) => {
