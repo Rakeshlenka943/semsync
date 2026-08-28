@@ -227,16 +227,18 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
       ) : (
         <div className="space-y-3">
           {filteredFaculty.map((f) => {
-            // Theory average
-            const theoryAvg = getAverage(
-              f.theory_friendliness_score + f.theory_notes_score + f.theory_teaching_score,
-              f.theory_friendliness_votes + f.theory_notes_votes + f.theory_teaching_votes
-            );
-            // Lab average
-            const labAvg = getAverage(
-              f.lab_strictness_score + f.lab_record_checking_score + f.lab_marks_leniency_score,
-              f.lab_strictness_votes + f.lab_record_checking_votes + f.lab_marks_leniency_votes
-            );
+            // Theory: average of the 3 criteria averages
+            const friendlinessAvg = getAverage(f.theory_friendliness_score, f.theory_friendliness_votes);
+            const notesAvg = getAverage(f.theory_notes_score, f.theory_notes_votes);
+            const teachingAvg = getAverage(f.theory_teaching_score, f.theory_teaching_votes);
+            const theoryAvg = (friendlinessAvg + notesAvg + teachingAvg) / 3;
+
+            // Lab: average of the 3 criteria averages
+            const strictnessAvg = getAverage(f.lab_strictness_score, f.lab_strictness_votes);
+            const recordAvg = getAverage(f.lab_record_checking_score, f.lab_record_checking_votes);
+            const marksAvg = getAverage(f.lab_marks_leniency_score, f.lab_marks_leniency_votes);
+            const labAvg = (strictnessAvg + recordAvg + marksAvg) / 3;
+
             return (
               <div
                 key={f.id}
