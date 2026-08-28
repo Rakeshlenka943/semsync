@@ -13,6 +13,8 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [needsRollNumber, setNeedsRollNumber] = useState(false);
+  const [rollNumberInput, setRollNumberInput] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,15 +22,23 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
     setIsLoading(true);
 
     const credentials: any = { password };
-    if (/^\d{8}$/.test(identifier)) {
-      credentials.rollNumber = identifier;
-    } else {
+    if (needsRollNumber) {
+      credentials.rollNumber = rollNumberInput;
       credentials.username = identifier;
+    } else {
+      if (/^\d{8}$/.test(identifier)) {
+        credentials.rollNumber = identifier;
+      } else {
+        credentials.username = identifier;
+      }
     }
 
     const result = await login(credentials);
     if (result.error) {
       setError(result.error.message);
+    } else if (result.needsRollNumber) {
+      setNeedsRollNumber(true);
+      setError(null);
     }
     setIsLoading(false);
   };
@@ -39,21 +49,43 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
-            Username, Email, or Roll Number
+            {needsRollNumber ? 'Enter your Roll Number' : 'Username, Email, or Roll Number'}
           </label>
-          <input
-            type="text"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: 'var(--bg)',
-              borderColor: 'var(--border)',
-              color: 'var(--text-primary)',
-            }}
-            required
-            placeholder="username, email, or roll number"
-          />
+          {needsRollNumber ? (
+            <>
+              <input
+                type="text"
+                value={rollNumberInput}
+                onChange={(e) => setRollNumberInput(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: 'var(--bg)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+                required
+                pattern="\d{8}"
+                placeholder="Enter your 8-digit roll number"
+              />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                Multiple users share this username. Please enter your roll number to verify.
+              </p>
+            </>
+          ) : (
+            <input
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: 'var(--bg)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-primary)',
+              }}
+              required
+              placeholder="username, email, or roll number"
+            />
+          )}
         </div>
 
         <div className="mb-4">
@@ -108,7 +140,7 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
           className="w-full font-semibold py-2 px-4 rounded-md transition disabled:opacity-50"
           style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
         >
-          {isLoading ? 'Logging in...' : 'Login'}
+          {isLoading ? 'Logging in...' : needsRollNumber ? 'Verify & Login' : 'Login'}
         </button>
       </form>
     </div>

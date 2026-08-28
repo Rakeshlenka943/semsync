@@ -14,10 +14,11 @@ import { DeadlinesManager } from './components/DeadlinesManager';
 import { ExamManagement } from './components/ExamManagement';
 import { ThemeForge } from './components/ThemeForge';
 import { WhisperNetwork } from './components/WhisperNetwork';
+import { AdminDashboard } from './components/AdminDashboard';
 import { Settings } from './components/Settings';
 import { GlobalNav } from './components/GlobalNav';
 
-type Page = 'dashboard' | 'timetable' | 'heatmap' | 'syllabus' | 'deadlines' | 'exams' | 'semester' | 'whisper' | 'theme' | 'settings';
+type Page = 'dashboard' | 'timetable' | 'heatmap' | 'syllabus' | 'deadlines' | 'exams' | 'semester' | 'whisper' | 'theme' | 'settings' | 'admin';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -25,6 +26,7 @@ function AppContent() {
   const [showRegister, setShowRegister] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -32,6 +34,20 @@ function AppContent() {
       setShowResetPassword(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      // Check if user is admin
+      supabase
+        .from('users')
+        .select('is_admin')
+        .eq('roll_number', user.roll_number)
+        .single()
+        .then(({ data }) => {
+          setIsAdmin(data?.is_admin || false);
+        });
+    }
+  }, [user]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
@@ -102,6 +118,8 @@ function AppContent() {
         return <ThemeForge onBack={() => setCurrentPage('dashboard')} />;
       case 'whisper':
         return <WhisperNetwork onBack={() => setCurrentPage('dashboard')} />;
+      case 'admin':
+        return isAdmin ? <AdminDashboard onBack={() => setCurrentPage('dashboard')} /> : <Dashboard onNavigate={setCurrentPage} />;
       case 'settings':
         return <Settings onBack={() => setCurrentPage('dashboard')} />;
       default:
@@ -111,7 +129,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
-      <GlobalNav currentPage={currentPage} onNavigate={setCurrentPage} />
+      <GlobalNav currentPage={currentPage} onNavigate={setCurrentPage} isAdmin={isAdmin} />
       <div className="pt-2">{renderPage()}</div>
     </div>
   );

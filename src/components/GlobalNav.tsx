@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Menu, Home, Calendar, Grid, BookOpen, Clipboard, Star, Palette, Settings, LogOut } from 'lucide-react';
+import { Menu, Home, Calendar, Grid, BookOpen, Clipboard, Star, Palette, Settings, LogOut, Shield } from 'lucide-react';
 
 interface GlobalNavProps {
   currentPage: string;
   onNavigate: (page: string) => void;
+  isAdmin?: boolean;
 }
 
 function getSemesterInfo(startDate: Date | null): string {
@@ -18,7 +19,7 @@ function getSemesterInfo(startDate: Date | null): string {
   return `${year}${suffix} Year, Sem ${semester}`;
 }
 
-export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate }) => {
+export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate, isAdmin }) => {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [semesterInfo, setSemesterInfo] = useState('');
@@ -52,6 +53,10 @@ export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate })
     { id: 'theme', label: 'Theme', icon: Palette },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  if (isAdmin) {
+    navItems.push({ id: 'admin', label: 'Admin', icon: Shield });
+  }
 
   return (
     <>

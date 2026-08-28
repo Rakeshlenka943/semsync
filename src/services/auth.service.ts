@@ -16,10 +16,9 @@ export async function signUp(data: SignUpData) {
 
   const email = `${rollNumber}@gmail.com`;
 
-  // 🔥 FIX: Clear any existing session before signup (prevents stale token issues)
+  // Clear any existing session
   await supabase.auth.signOut();
 
-  // 1. Create auth user (the trigger will insert the profile)
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -34,7 +33,6 @@ export async function signUp(data: SignUpData) {
   });
 
   if (authError) {
-    // Check if user already exists in auth
     if (authError.message?.includes('User already registered')) {
       return {
         user: null,
@@ -45,7 +43,6 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: authError };
   }
 
-  // 2. Fetch the newly created user profile (trigger should have created it)
   const { data: userData, error: fetchError } = await supabase
     .from('users')
     .select('*')
@@ -63,23 +60,76 @@ export async function signUp(data: SignUpData) {
 export async function signIn(credentials: AuthCredentials) {
   const { username, rollNumber, password } = credentials;
   let finalRollNumber = rollNumber;
-  if (!finalRollNumber && username) {
-    const { data } = await supabase.from('users').select('roll_number').eq('username', username);
-    if (!data || data.length === 0) return { user: null, error: new Error('User not found') };
-    if (data.length > 1) return { user: null, error: null, needsRollNumber: true };
-    finalRollNumber = data[0].roll_number;
+  let needsRollNumber = false;
+
+  // If roll number provided directly, use it
+  if (finalRollNumber) {
+    const email = `${finalRollNumber}@gmail.com`;
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      return { user: null, error };
+    }
+    const { data: userData, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('roll_number', finalRollNumber)
+      .single();
+    if (fetchError) return { user: null, error: fetchError };
+    return { user: userData as User, error: null };
   }
-  if (!finalRollNumber) return { user: null, error: new Error('No roll number provided') };
-  const email = `${finalRollNumber}@gmail.com`;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { user: null, error };
-  const { data: userData, error: fetchError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('roll_number', finalRollNumber)
-    .single();
-  if (fetchError) return { user: null, error: fetchError };
-  return { user: userData as User, error: null };
+
+  // If username provided, check if multiple users share it
+  if (username) {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('roll_number, username')
+      .eq('username', username);
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    if (!users || users.length === 0) {
+      // Try to find by email (if username is actually an email)
+      const { data: emailUsers } = await supabase
+        .from('users')
+        .select('roll_number')
+        .eq('email', username);
+      if (emailUsers && emailUsers.length > 0) {
+        const email = username;
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) return { user: null, error: signInError };
+        const { data: userData, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', username)
+          .single();
+        if (fetchError) return { user: null, error: fetchError };
+        return { user: userData as User, error: null };
+      }
+      return { user: null, error: new Error('User not found') };
+    }
+
+    if (users.length > 1) {
+      // Multiple users with same username → need roll number
+      return { user: null, error: null, needsRollNumber: true };
+    }
+
+    // Exactly one user with this username
+    finalRollNumber = users[0].roll_number;
+    const email = `${finalRollNumber}@gmail.com`;
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) return { user: null, error: signInError };
+    const { data: userData, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('roll_number', finalRollNumber)
+      .single();
+    if (fetchError) return { user: null, error: fetchError };
+    return { user: userData as User, error: null };
+  }
+
+  return { user: null, error: new Error('Please provide username or roll number') };
 }
 
 export async function signOut() { return supabase.auth.signOut(); }
