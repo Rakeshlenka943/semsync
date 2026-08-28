@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Plus, X, Calendar, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, X, Calendar, Trash2 } from 'lucide-react';
+import { CalendarPicker } from './CalendarPicker';
 
 interface ExamManagementProps {
   onBack: () => void;
@@ -12,11 +13,6 @@ interface Exam {
   subject: string;
   date: string;
   type: 'mid' | 'end' | 'lab';
-}
-
-interface TimetableSlot {
-  subject_name: string;
-  subject_code: string;
 }
 
 const EXAM_TYPES: Record<string, { label: string; color: string }> = {
@@ -31,11 +27,23 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     subject: '',
     type: 'mid' as 'mid' | 'end' | 'lab',
     date: '',
   });
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -92,6 +100,7 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
     }
     setFormData({ subject: '', type: 'mid', date: '' });
     setShowAddModal(false);
+    setShowDatePicker(false);
     fetchExams();
   };
 
@@ -113,13 +122,17 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
     return diff;
   };
 
+  const handleDateSelect = (date: Date) => {
+    setFormData({ ...formData, date: date.toISOString().split('T')[0] });
+    setShowDatePicker(false);
+  };
+
   if (loading) {
     return <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>Loading exams...</div>;
   }
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
@@ -128,7 +141,7 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>📅 Exam Management</h1>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { setShowAddModal(true); }}
           className="px-4 py-2 rounded text-sm flex items-center gap-1"
           style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
         >
@@ -136,7 +149,6 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
         </button>
       </div>
 
-      {/* Exams List */}
       <div className="space-y-3">
         {exams.length === 0 ? (
           <div className="p-8 text-center" style={{ color: 'var(--text-secondary)' }}>
@@ -197,12 +209,11 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
         )}
       </div>
 
-      {/* Add Exam Modal */}
       {showAddModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: 'rgba(44, 37, 32, 0.6)' }}
-          onClick={() => setShowAddModal(false)}
+          onClick={() => { setShowAddModal(false); setShowDatePicker(false); }}
         >
           <div
             className="max-w-md w-full rounded-lg shadow-xl p-6"
@@ -211,7 +222,7 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">➕ Add Exam</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-1 rounded hover:bg-opacity-10" style={{ color: 'var(--text-muted)' }}>
+              <button onClick={() => { setShowAddModal(false); setShowDatePicker(false); }} className="p-1 rounded hover:bg-opacity-10" style={{ color: 'var(--text-muted)' }}>
                 <X size={20} />
               </button>
             </div>
@@ -265,18 +276,33 @@ export const ExamManagement: React.FC<ExamManagementProps> = ({ onBack }) => {
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
                   Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                  style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-primary)',
-                  }}
-                  required
-                />
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-full px-3 py-2 border rounded-md text-left focus:outline-none focus:ring-2 flex items-center justify-between"
+                    style={{
+                      backgroundColor: 'var(--bg)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span>
+                      {formData.date
+                        ? new Date(formData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'Select date'}
+                    </span>
+                    <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
+                  </button>
+                  {showDatePicker && (
+                    <div className="absolute z-10 mt-1 left-0 w-full">
+                      <CalendarPicker
+                        value={formData.date ? new Date(formData.date) : null}
+                        onChange={handleDateSelect}
+                        onClose={() => setShowDatePicker(false)}
+                      />
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                   The day before and after will be automatically treated as holidays.
                 </p>

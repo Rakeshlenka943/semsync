@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { 
   ArrowLeft, Plus, X, CheckCircle, Circle, Calendar, 
   Filter, Edit2, Trash2, Clock, AlertTriangle 
 } from 'lucide-react';
+import { DateTimePicker } from './DateTimePicker';
 
 interface DeadlinesManagerProps {
   onBack: () => void;
@@ -52,6 +53,8 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [subjects, setSubjects] = useState<TimetableSlot[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
   // Add/Edit form state
   const [formData, setFormData] = useState({
@@ -62,6 +65,17 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
     description: '',
   });
   const [isEditing, setIsEditing] = useState(false);
+
+  // Click outside to close date picker
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -77,7 +91,6 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
       .eq('is_active', true);
 
     if (!error && data) {
-      // Deduplicate subjects
       const unique = Array.from(
         new Map(data.map(s => [s.subject_name, s])).values()
       );
@@ -181,7 +194,7 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
       id: deadline.id,
       subject_name: deadline.subject_name,
       bounty_type: deadline.bounty_type,
-      due_date: deadline.due_date.slice(0, 16),
+      due_date: deadline.due_date,
       description: deadline.description || '',
     });
     setIsEditing(true);
@@ -198,6 +211,7 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
     });
     setIsEditing(false);
     setShowAddModal(false);
+    setShowDatePicker(false);
   };
 
   const getTypeLabel = (type: string) => TYPE_LABELS[type] || type;
@@ -210,13 +224,17 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
     { value: 'custom', label: '⚡ Custom' },
   ];
 
+  const handleDateSelect = (date: Date) => {
+    setFormData({ ...formData, due_date: date.toISOString() });
+    setShowDatePicker(false);
+  };
+
   if (loading) {
     return <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>Loading deadlines...</div>;
   }
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
@@ -233,7 +251,6 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
         </button>
       </div>
 
-      {/* Filter */}
       <div className="mb-4 flex flex-wrap gap-2">
         {typeOptions.map((opt) => (
           <button
@@ -251,7 +268,6 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
         ))}
       </div>
 
-      {/* Deadlines List */}
       <div className="space-y-2">
         {deadlines
           .filter(d => filterType === 'all' || d.bounty_type === filterType)
@@ -284,7 +300,7 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
                   <div className="flex items-center gap-3 text-sm mt-1">
                     <span style={{ color: 'var(--text-secondary)' }}>
                       <Calendar size={14} className="inline mr-1" />
-                      {new Date(deadline.due_date).toLocaleDateString()} {new Date(deadline.due_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(deadline.due_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {deadline.description && (
                       <span style={{ color: 'var(--text-muted)' }}>• {deadline.description}</span>
@@ -393,18 +409,33 @@ export const DeadlinesManager: React.FC<DeadlinesManagerProps> = ({ onBack }) =>
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
                   Due Date & Time <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                  style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-primary)',
-                  }}
-                  required
-                />
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-full px-3 py-2 border rounded-md text-left focus:outline-none focus:ring-2 flex items-center justify-between"
+                    style={{
+                      backgroundColor: 'var(--bg)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span>
+                      {formData.due_date
+                        ? new Date(formData.due_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'Select date & time'}
+                    </span>
+                    <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
+                  </button>
+                  {showDatePicker && (
+                    <div className="absolute z-10 mt-1 left-0 w-full">
+                      <DateTimePicker
+                        value={formData.due_date ? new Date(formData.due_date) : null}
+                        onChange={handleDateSelect}
+                        onClose={() => setShowDatePicker(false)}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Description */}

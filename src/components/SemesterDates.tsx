@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Calendar, AlertTriangle, CheckCircle, X, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, X, Lock, Calendar } from 'lucide-react';
+import { CalendarPicker } from './CalendarPicker';
 
 interface SemesterDatesProps {
   onBack: () => void;
@@ -20,8 +21,24 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
   const [success, setSuccess] = useState(false);
   const [hasExisting, setHasExisting] = useState(false);
   const [originalStartDate, setOriginalStartDate] = useState<string>('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const startPickerRef = useRef<HTMLDivElement>(null);
+  const endPickerRef = useRef<HTMLDivElement>(null);
 
-  // Load existing dates
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (startPickerRef.current && !startPickerRef.current.contains(e.target as Node)) {
+        setShowStartPicker(false);
+      }
+      if (endPickerRef.current && !endPickerRef.current.contains(e.target as Node)) {
+        setShowEndPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     const loadDates = async () => {
@@ -46,16 +63,12 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
     loadDates();
   }, [user]);
 
-  // Save only end date (or start if first time)
   const handleSave = async () => {
-    // If start date is already set, we only update end date
     if (hasExisting) {
-      // Only update end date
       await updateEndDate();
       return;
     }
 
-    // First time: save both
     if (!startDate) {
       setError('Please select a semester start date.');
       return;
@@ -86,7 +99,6 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
     setSaving(false);
   };
 
-  // Update only end date
   const updateEndDate = async () => {
     setSaving(true);
     setError(null);
@@ -106,13 +118,11 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
     setSaving(false);
   };
 
-  // Open change start date modal
   const requestStartDateChange = () => {
     setShowStartDateChangeModal(true);
     setConfirmText('');
   };
 
-  // Handle start date change with confirmation
   const confirmStartDateChange = async () => {
     if (confirmText !== 'CONFIRM') {
       setError('Type "CONFIRM" to proceed.');
@@ -126,7 +136,6 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
     setSaving(true);
     setError(null);
 
-    // Update start date (this is the permanent change)
     const { error: updateError } = await supabase
       .from('semester_dates')
       .update({ semester_start: startDate })
@@ -143,13 +152,22 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
     setSaving(false);
   };
 
+  const handleStartDateSelect = (date: Date) => {
+    setStartDate(date.toISOString().split('T')[0]);
+    setShowStartPicker(false);
+  };
+
+  const handleEndDateSelect = (date: Date) => {
+    setEndDate(date.toISOString().split('T')[0]);
+    setShowEndPicker(false);
+  };
+
   if (loading) {
     return <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>Loading...</div>;
   }
 
   return (
     <div className="p-4 max-w-2xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
           <ArrowLeft size={24} />
@@ -171,14 +189,13 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Warning Banner */}
       {!hasExisting ? (
         <div className="mb-6 p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: 'rgba(212, 167, 74, 0.15)', border: '1px solid var(--warning)' }}>
           <AlertTriangle size={24} style={{ color: 'var(--warning)' }} />
           <div>
             <p className="font-medium" style={{ color: 'var(--text-primary)' }}>⚠️ Important: One-Time Setup</p>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              The semester start date determines when attendance tracking begins. 
+              The semester start date determines when attendance tracking begins.
               <strong> This date is PERMANENT and cannot be changed later.</strong>
               Please double-check before saving.
             </p>
@@ -196,35 +213,41 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Dates Form */}
       <div className="p-4 rounded-lg mb-6" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
         <h3 className="font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
           {hasExisting ? 'Manage Semester Dates' : 'Set Semester Dates'}
         </h3>
         
-        {/* Start Date - Permanently locked after first set */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
             Semester Start Date <span className="text-red-500">*</span>
           </label>
-          <div className="relative">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+          <div className="relative" ref={startPickerRef}>
+            <button
+              onClick={() => !hasExisting && setShowStartPicker(!showStartPicker)}
               disabled={hasExisting}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 disabled:opacity-60"
+              className="w-full px-3 py-2 border rounded-md text-left flex items-center justify-between disabled:opacity-60"
               style={{
                 backgroundColor: hasExisting ? 'var(--bg)' : 'var(--bg)',
                 borderColor: hasExisting ? 'var(--text-muted)' : 'var(--border)',
                 color: hasExisting ? 'var(--text-muted)' : 'var(--text-primary)',
               }}
-              required={!hasExisting}
-            />
-            {hasExisting && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-                <Lock size={16} style={{ color: 'var(--text-muted)' }} />
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Permanent</span>
+            >
+              <span>
+                {startDate
+                  ? new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'Select start date'}
+              </span>
+              {!hasExisting && <Calendar size={18} style={{ color: 'var(--text-muted)' }} />}
+              {hasExisting && <Lock size={16} style={{ color: 'var(--text-muted)' }} />}
+            </button>
+            {!hasExisting && showStartPicker && (
+              <div className="absolute z-10 mt-1 left-0 w-full">
+                <CalendarPicker
+                  value={startDate ? new Date(startDate) : null}
+                  onChange={handleStartDateSelect}
+                  onClose={() => setShowStartPicker(false)}
+                />
               </div>
             )}
           </div>
@@ -250,22 +273,37 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
           </p>
         </div>
 
-        {/* End Date - Always editable */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
             Semester End Date <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(optional)</span>
           </label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: 'var(--bg)',
-              borderColor: 'var(--border)',
-              color: 'var(--text-primary)',
-            }}
-          />
+          <div className="relative" ref={endPickerRef}>
+            <button
+              onClick={() => setShowEndPicker(!showEndPicker)}
+              className="w-full px-3 py-2 border rounded-md text-left flex items-center justify-between"
+              style={{
+                backgroundColor: 'var(--bg)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <span>
+                {endDate
+                  ? new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'Select end date'}
+              </span>
+              <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
+            </button>
+            {showEndPicker && (
+              <div className="absolute z-10 mt-1 left-0 w-full">
+                <CalendarPicker
+                  value={endDate ? new Date(endDate) : null}
+                  onChange={handleEndDateSelect}
+                  onClose={() => setShowEndPicker(false)}
+                />
+              </div>
+            )}
+          </div>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             After this date, all classes will be hidden automatically (exam prep period).
             You can change this anytime.
@@ -293,7 +331,6 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
         )}
       </div>
 
-      {/* Confirmation Modal - First time setup */}
       {showConfirm && !hasExisting && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -350,7 +387,6 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Change Start Date Modal - With extra confirmation */}
       {showStartDateChangeModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -384,17 +420,33 @@ export const SemesterDates: React.FC<SemesterDatesProps> = ({ onBack }) => {
               <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
                 New Start Date
               </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: 'var(--bg)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text-primary)',
-                }}
-              />
+              <div className="relative">
+                <button
+                  onClick={() => setShowStartPicker(!showStartPicker)}
+                  className="w-full px-3 py-2 border rounded-md text-left flex items-center justify-between"
+                  style={{
+                    backgroundColor: 'var(--bg)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <span>
+                    {startDate
+                      ? new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : 'Select date'}
+                  </span>
+                  <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
+                </button>
+                {showStartPicker && (
+                  <div className="absolute z-10 mt-1 left-0 w-full">
+                    <CalendarPicker
+                      value={startDate ? new Date(startDate) : null}
+                      onChange={handleStartDateSelect}
+                      onClose={() => setShowStartPicker(false)}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mb-4">

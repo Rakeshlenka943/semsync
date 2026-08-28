@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { CheckCircle, Circle, Plus, Calendar, AlertTriangle, Trash2, X } from 'lucide-react';
+import { Plus, Calendar, AlertTriangle, Trash2, X } from 'lucide-react';
+import { DateTimePicker } from './DateTimePicker';
 
 interface Deadline {
   id: string;
@@ -25,12 +26,24 @@ export const Deadlines: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     subject_name: '',
     bounty_type: 'assignment' as 'assignment' | 'quiz' | 'project' | 'custom',
     due_date: '',
     description: '',
   });
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -56,7 +69,6 @@ export const Deadlines: React.FC = () => {
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Delete old deadlines
     await supabase
       .from('deadlines')
       .delete()
@@ -134,7 +146,13 @@ export const Deadlines: React.FC = () => {
 
     setFormData({ subject_name: '', bounty_type: 'assignment', due_date: '', description: '' });
     setShowAddModal(false);
+    setShowDatePicker(false);
     fetchDeadlines();
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setFormData({ ...formData, due_date: date.toISOString() });
+    setShowDatePicker(false);
   };
 
   const getTimeDisplay = (dueDate: string): string => {
@@ -197,7 +215,7 @@ export const Deadlines: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 text-xs" style={{ color: urgent ? 'var(--danger)' : 'var(--text-secondary)' }}>
                   <Calendar size={12} className="inline" />
-                  {new Date(d.due_date).toLocaleDateString()} • {getTimeDisplay(d.due_date)}
+                  {new Date(d.due_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} • {getTimeDisplay(d.due_date)}
                 </div>
               </div>
               <button
@@ -212,12 +230,11 @@ export const Deadlines: React.FC = () => {
         })
       )}
 
-      {/* Add Modal */}
       {showAddModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backgroundColor: 'rgba(44, 37, 32, 0.6)' }}
-          onClick={() => setShowAddModal(false)}
+          onClick={() => { setShowAddModal(false); setShowDatePicker(false); }}
         >
           <div
             className="max-w-sm w-full rounded-lg shadow-xl p-6"
@@ -226,7 +243,7 @@ export const Deadlines: React.FC = () => {
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">➕ Add Deadline</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-1 rounded hover:bg-opacity-10" style={{ color: 'var(--text-muted)' }}>
+              <button onClick={() => { setShowAddModal(false); setShowDatePicker(false); }} className="p-1 rounded hover:bg-opacity-10" style={{ color: 'var(--text-muted)' }}>
                 <X size={20} />
               </button>
             </div>
@@ -280,18 +297,33 @@ export const Deadlines: React.FC = () => {
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
                   Due Date & Time <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                  style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-primary)',
-                  }}
-                  required
-                />
+                <div className="relative" ref={datePickerRef}>
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="w-full px-3 py-2 border rounded-md text-left focus:outline-none focus:ring-2 flex items-center justify-between"
+                    style={{
+                      backgroundColor: 'var(--bg)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span>
+                      {formData.due_date
+                        ? new Date(formData.due_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'Select date & time'}
+                    </span>
+                    <Calendar size={18} style={{ color: 'var(--text-muted)' }} />
+                  </button>
+                  {showDatePicker && (
+                    <div className="absolute z-10 mt-1 left-0 w-full">
+                      <DateTimePicker
+                        value={formData.due_date ? new Date(formData.due_date) : null}
+                        onChange={handleDateSelect}
+                        onClose={() => setShowDatePicker(false)}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
