@@ -222,15 +222,11 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
   const [semesterEndDate, setSemesterEndDate] = useState<Date | null>(null);
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
   const [showExtraClassModal, setShowExtraClassModal] = useState(false);
-  const [showMassHolidayModal, setShowMassHolidayModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState<{
     action: 'delete_extra';
     message: string;
     payload?: any;
   } | null>(null);
-  const [holidayStartDate, setHolidayStartDate] = useState<string>('');
-  const [holidayEndDate, setHolidayEndDate] = useState<string>('');
-  const [holidayLoading, setHolidayLoading] = useState(false);
   const [globalTarget, setGlobalTarget] = useState<number>(75);
   const [subjectTargets, setSubjectTargets] = useState<Map<string, number>>(new Map());
 
@@ -409,63 +405,35 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Mass Holiday – bulk upsert, no confirmation
-  const handleMassHoliday = async () => {
-    if (!user || !holidayStartDate || !holidayEndDate) return;
-    const start = new Date(holidayStartDate);
-    const end = new Date(holidayEndDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      alert('Invalid date format.');
+  // ✅ NEW: Holiday for the day – marks all subjects as holiday
+  const markDayAsHoliday = async (date: Date) => {
+    if (!user) return;
+    const dateStr = getLocalDateStr(date);
+    const dayOfWeek = date.getDay();
+    const daySlots = slots.filter(s => 
+      (s.day_of_week === dayOfWeek && !s.specific_date) || 
+      s.specific_date === dateStr
+    );
+    if (daySlots.length === 0) {
+      alert('No classes found for this day.');
       return;
     }
-    if (start > end) {
-      alert('Start date must be before or equal to end date.');
-      return;
-    }
-
-    setHolidayLoading(true);
-    const entries: any[] = [];
-    const current = new Date(start);
-    while (current <= end) {
-      const dayOfWeek = current.getDay();
-      const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
-      const dateStr = getLocalDateStr(current);
-      for (const slot of daySlots) {
-        entries.push({
-          user_roll: user.roll_number,
-          subject_code: slot.subject_code,
-          log_date: dateStr,
-          status: 'holiday',
-        });
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    if (entries.length === 0) {
-      alert('No classes found in the selected date range.');
-      setHolidayLoading(false);
-      setShowMassHolidayModal(false);
-      setHolidayStartDate('');
-      setHolidayEndDate('');
-      return;
-    }
-
+    const entries = daySlots.map(slot => ({
+      user_roll: user.roll_number,
+      subject_code: slot.subject_code,
+      log_date: dateStr,
+      status: 'holiday',
+    }));
     const { error } = await supabase
       .from('attendance_logs')
       .upsert(entries, { onConflict: 'user_roll, subject_code, log_date' });
-
     if (error) {
-      console.error('Mass holiday error:', error);
+      console.error('Holiday upsert error:', error);
       alert('Failed to mark holiday. Please try again.');
-    } else {
-      await refreshLogs();
-      alert(`✅ ${entries.length} class(es) marked as holiday.`);
+      return;
     }
-
-    setHolidayLoading(false);
-    setShowMassHolidayModal(false);
-    setHolidayStartDate('');
-    setHolidayEndDate('');
+    refreshLogs();
+    setSelectedDay(date);
   };
 
   const deleteExtraClass = async (slotId: string, date: Date) => {
@@ -766,18 +734,9 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
           </button>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>📊 Monthly Heatmap</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowMassHolidayModal(true)}
-            className="px-3 py-1 rounded text-sm flex items-center gap-1"
-            style={{ backgroundColor: '#4caf50', color: '#fff' }}
-          >
-            🏖️ Mass Holiday
-          </button>
-          <button onClick={goToToday} className="px-3 py-1 rounded text-sm" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
-            Today
-          </button>
-        </div>
+        <button onClick={goToToday} className="px-3 py-1 rounded text-sm" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
+          Today
+        </button>
       </div>
 
       {/* Navigation */}
@@ -962,7 +921,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     )}
                   </div>
 
-                  {/* Quick Actions – no confirmation */}
+                  {/* Quick Actions – Now includes Holiday button */}
                   <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-xs font-medium mr-1" style={{ color: 'var(--text-secondary)' }}>⚡ Quick:</span>
@@ -979,6 +938,13 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                         style={{ backgroundColor: 'var(--danger)', color: '#fff' }}
                       >
                         <XCircle size={12} /> All Absent
+                      </button>
+                      <button
+                        onClick={() => markDayAsHoliday(selectedDay)}
+                        className="px-3 py-1 rounded text-xs font-medium hover:scale-105 transition flex items-center gap-1"
+                        style={{ backgroundColor: '#4caf50', color: '#fff' }}
+                      >
+                        <Trash2 size={12} /> Holiday
                       </button>
                       <button
                         onClick={() => clearAll(selectedDay)}
@@ -1181,79 +1147,6 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
               {getTheorySubjects().length === 0 && (
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No theory subjects found. Add subjects in Timetable Builder first.</p>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mass Holiday Modal */}
-      {showMassHolidayModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(44, 37, 32, 0.5)' }}
-          onClick={() => setShowMassHolidayModal(false)}
-        >
-          <div
-            className="max-w-sm w-full rounded-lg shadow-xl p-6"
-            style={{ backgroundColor: 'var(--card)', color: 'var(--text-primary)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">🏖️ Mass Holiday</h3>
-              <button onClick={() => setShowMassHolidayModal(false)} className="p-1 rounded hover:bg-opacity-10" style={{ color: 'var(--text-muted)' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
-              Select a date range to mark ALL classes as holiday:
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Start Date</label>
-                <input
-                  type="date"
-                  value={holidayStartDate}
-                  onChange={(e) => setHolidayStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                  style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>End Date</label>
-                <input
-                  type="date"
-                  value={holidayEndDate}
-                  onChange={(e) => setHolidayEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                  style={{
-                    backgroundColor: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowMassHolidayModal(false)}
-                  className="flex-1 px-4 py-2 rounded text-sm font-medium"
-                  style={{ backgroundColor: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleMassHoliday}
-                  disabled={!holidayStartDate || !holidayEndDate || holidayLoading}
-                  className="flex-1 px-4 py-2 rounded text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-1"
-                  style={{ backgroundColor: '#4caf50', color: '#fff' }}
-                >
-                  {holidayLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-                  Mark Holiday
-                </button>
-              </div>
             </div>
           </div>
         </div>
