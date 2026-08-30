@@ -82,12 +82,39 @@ function getStatusColor(status: string): string {
 function getSubjectStatsUpToDate(
   subjectCode: string,
   allLogs: AttendanceLog[],
+  allSlots: TimetableSlot[],
   upToDate: Date,
   subjectName: string,
   isLab: boolean,
   target: number
 ): SubjectAttendanceStats {
   const upToDateStr = getLocalDateStr(upToDate);
+  // Find all slots for this subject (regular + extra)
+  const subjectSlots = allSlots.filter(s => s.subject_code === subjectCode);
+  // Count total classes up to the date:
+  // For regular slots: they occur on every day_of_week up to the date.
+  // For extra slots: they occur only on their specific_date.
+  let totalClasses = 0;
+  const currentDate = new Date(upToDate);
+  currentDate.setHours(0, 0, 0, 0);
+  const startDate = new Date(upToDate);
+  startDate.setMonth(startDate.getMonth()); // same month
+  startDate.setDate(1);
+  startDate.setHours(0, 0, 0, 0);
+  // Iterate day by day from start of month to upToDate
+  const iterDate = new Date(startDate);
+  while (iterDate <= currentDate) {
+    const dateStr = getLocalDateStr(iterDate);
+    const dayOfWeek = iterDate.getDay(); // 0=Sun, 6=Sat
+    // Count regular slots for this day
+    const regularSlots = subjectSlots.filter(s => !s.specific_date && s.day_of_week === dayOfWeek);
+    // Count extra slots for this specific date
+    const extraSlots = subjectSlots.filter(s => s.specific_date === dateStr);
+    totalClasses += regularSlots.length + extraSlots.length;
+    iterDate.setDate(iterDate.getDate() + 1);
+  }
+
+  // Now gather logs for this subject up to date
   const relevantLogs = allLogs.filter(log => {
     return log.subject_code === subjectCode && log.log_date <= upToDateStr;
   });
@@ -101,9 +128,10 @@ function getSubjectStatsUpToDate(
     else if (log.status === 'holiday') stats.holiday++;
   });
 
-  const total = stats.present + stats.absent + stats.teacher_absent + stats.proxy + stats.holiday;
+  // totalClasses already counts all scheduled classes.
+  // offs = teacher_absent + holiday (these are logs that mark class as not counted)
   const offs = stats.teacher_absent + stats.holiday;
-  const effectiveTotal = total - offs;
+  const effectiveTotal = totalClasses - offs;
   const attended = stats.present + stats.proxy;
   const percentage = effectiveTotal > 0 ? (attended / effectiveTotal) * 100 : 0;
 
@@ -111,7 +139,7 @@ function getSubjectStatsUpToDate(
     subject_code: subjectCode,
     subject_name: subjectName,
     is_lab: isLab,
-    total,
+    total: totalClasses,
     present: stats.present,
     absent: stats.absent,
     teacher_absent: stats.teacher_absent,
@@ -266,7 +294,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       if (semData?.semester_start) setSemesterStartDate(new Date(semData.semester_start));
       if (semData?.semester_end) setSemesterEndDate(new Date(semData.semester_end));
 
-      // Fetch active slots
+      // Fetch active slots (including extras)
       const { data: slotsData } = await supabase
         .from('timetable_slots')
         .select('*')
@@ -405,7 +433,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // ✅ NEW: Holiday for the day – marks all subjects as holiday
+  // Holiday for the day – marks all subjects as holiday
   const markDayAsHoliday = async (date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -515,7 +543,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
   const buildCalendar = (): any[][] => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    const startDay = firstDayOfMonth.getDay();
+    const startDay = firstDayOfMonth.getDay(); // 0=Sun, 6=Sat
     const daysInMonth = lastDayOfMonth.getDate();
     const weeks: any[][] = [];
     let currentWeek: any[] = [];
@@ -963,6 +991,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     const stats = getSubjectStatsUpToDate(
                       subject.code,
                       allLogs,
+                      slots,
                       selectedDay,
                       subject.slot.subject_name,
                       subject.slot.is_lab,
