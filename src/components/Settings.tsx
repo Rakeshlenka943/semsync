@@ -33,12 +33,11 @@ interface SubjectTarget {
   target_percentage: number;
 }
 
-// Avatar mapping
 const AVATAR_COUNT = 8;
 const getAvatarPath = (id: number): string => `/avatars/avatar-${id}.svg`;
 
 export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth(); // ✅ Added refreshUser
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [semesterDates, setSemesterDates] = useState<SemesterDates | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +46,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [editingSubject, setEditingSubject] = useState<string | null>(null);
   const [tempTarget, setTempTarget] = useState<number>(75);
   
-  // General settings state
   const [target, setTarget] = useState<number>(75);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -56,13 +54,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [selectedAvatar, setSelectedAvatar] = useState<number>(1);
   const [avatarSaving, setAvatarSaving] = useState(false);
 
-  // Semester transition state
   const [showTransitionModal, setShowTransitionModal] = useState(false);
   const [newStartDate, setNewStartDate] = useState<string>('');
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [transitionStep, setTransitionStep] = useState<'confirm' | 'processing' | 'done'>('confirm');
 
-  // Export/Import state
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
 
@@ -129,7 +125,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     setSubjects(subjectTargets);
   };
 
-  // === GENERAL SETTINGS ===
   const updateTarget = async () => {
     if (!user) return;
     const { error } = await supabase
@@ -186,7 +181,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     }
   };
 
-  // === AVATAR ===
+  // ✅ FIX: Update avatar and refresh user context
   const updateAvatar = async (avatarId: number) => {
     if (!user) return;
     setAvatarSaving(true);
@@ -196,16 +191,13 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
       .eq('roll_number', user.roll_number);
     if (!error) {
       setSelectedAvatar(avatarId);
-      // Update local profile
-      if (profile) setProfile({ ...profile, avatar_id: avatarId });
-      // Also update user object in AuthContext? We'll refetch on next load.
+      await refreshUser(); // ✅ Force refresh user data from database
     } else {
       alert('Failed to update avatar.');
     }
     setAvatarSaving(false);
   };
 
-  // === SEMESTER TRANSITION ===
   const handleStartTransition = async () => {
     if (!user || !newStartDate) return;
     setTransitionLoading(true);
@@ -255,7 +247,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     }
   };
 
-  // === EXPORT DATA ===
   const exportData = async () => {
     if (!user) return;
     const tables = ['timetable_slots', 'attendance_logs', 'deadlines', 'syllabus_progress', 'exam_dates', 'subject_attendance_targets'];
@@ -278,7 +269,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     URL.revokeObjectURL(url);
   };
 
-  // === IMPORT DATA ===
   const importData = async () => {
     if (!importFile || !user) return;
     setImportLoading(true);
@@ -352,7 +342,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
       {activeTab === 'general' && (
         <div className="space-y-6">
-          {/* Profile Info */}
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>👤 Profile</h3>
             <div className="space-y-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -401,7 +390,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Global Attendance Target */}
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
               <Target size={18} /> Global Attendance Target
@@ -430,7 +418,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Per-Subject Targets */}
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
               <BookOpen size={18} /> Subject-Specific Targets
@@ -511,7 +498,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Change Password */}
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
               <Lock size={18} /> Change Password
@@ -661,7 +647,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Transition Modal */}
       {showTransitionModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
