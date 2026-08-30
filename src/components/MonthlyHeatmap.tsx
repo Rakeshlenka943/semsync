@@ -45,7 +45,7 @@ interface SubjectAttendanceStats {
   percentage: number;
 }
 
-// Helper: get local date string YYYY-MM-DD
+// Helper: local date string YYYY-MM-DD
 function getLocalDateStr(date: Date): string {
   return date.toLocaleDateString('en-CA');
 }
@@ -124,7 +124,7 @@ function getSubjectStatsUpToDate(
   };
 }
 
-// Tooltip Button
+// Tooltip Button (fixed position)
 const TooltipButton: React.FC<{
   children: React.ReactNode;
   tooltip: string;
@@ -410,7 +410,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // ✅ Holiday for the day – marks all slots as holiday
+  // Holiday for the day – marks all slots as holiday
   const markDayAsHoliday = async (date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -539,21 +539,20 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Build calendar using UTC to avoid timezone shift
+  // Build calendar using local dates (no UTC)
   const buildCalendar = (): any[][] => {
-    const firstDayOfMonth = new Date(Date.UTC(currentYear, currentMonth, 1));
-    const lastDayOfMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
-    const startDay = firstDayOfMonth.getUTCDay(); // 0=Sun, 6=Sat
-    const daysInMonth = lastDayOfMonth.getUTCDate();
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+    const startDay = firstDayOfMonth.getDay(); // 0=Sun
+    const daysInMonth = lastDayOfMonth.getDate();
     const weeks: any[][] = [];
     let currentWeek: any[] = [];
     const today = new Date();
     const todayStr = getLocalDateStr(today);
 
     for (let d = 1; d <= daysInMonth; d++) {
-      // Use UTC to create date at midnight UTC, then convert to local string for display
-      const date = new Date(Date.UTC(currentYear, currentMonth, d));
-      const dayOfWeek = date.getUTCDay();
+      const date = new Date(currentYear, currentMonth, d);
+      const dayOfWeek = date.getDay();
       const dateStr = getLocalDateStr(date);
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
@@ -903,21 +902,18 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                 return <div style={{ color: 'var(--text-secondary)' }}>No classes on this day.</div>;
               }
 
-              // Group by subject_code but keep slots separate for extra classes
+              // Group by slot.id to keep each class separate
               const subjectMap = new Map<string, any>();
               dayData.classes.forEach((cls: any) => {
-                const code = cls.slot.subject_code;
-                // Create a unique key for each slot, but we want to show them separately if they are extra classes
-                const isExtra = cls.isExtraClass;
-                const key = isExtra ? `${code}-extra-${cls.slot.id}` : code;
+                const key = cls.slot.id; // unique per slot
                 if (!subjectMap.has(key)) {
                   subjectMap.set(key, {
-                    code,
+                    code: cls.slot.subject_code,
                     slot: cls.slot,
                     hasLog: false,
                     status: 'no_data',
                     startTime: cls.slot.start_time,
-                    isExtraClass: isExtra,
+                    isExtraClass: cls.isExtraClass,
                     subjectName: cls.slot.subject_name,
                     isLab: cls.slot.is_lab,
                   });
@@ -990,7 +986,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
 
                   {/* Subjects – each slot separately */}
                   {subjects.map((subject: any) => {
-                    const isExpanded = expandedSubject === `${subject.code}-${subject.slot.id}`;
+                    const isExpanded = expandedSubject === subject.slot.id;
                     const target = subjectTargets.get(subject.code) || globalTarget;
                     const stats = getSubjectStatsUpToDate(
                       subject.code,
@@ -1010,7 +1006,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                       >
                         <div
                           className="flex items-center justify-between p-3 cursor-pointer hover:bg-opacity-5"
-                          onClick={() => setExpandedSubject(isExpanded ? null : `${subject.code}-${subject.slot.id}`)}
+                          onClick={() => setExpandedSubject(isExpanded ? null : subject.slot.id)}
                           style={{ backgroundColor: 'var(--card)' }}
                         >
                           <div className="flex items-center gap-2">
