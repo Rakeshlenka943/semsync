@@ -45,8 +45,9 @@ interface SubjectAttendanceStats {
   percentage: number;
 }
 
+// Helper: get local date string YYYY-MM-DD
 function getLocalDateStr(date: Date): string {
-  return date.toISOString().split('T')[0]; // Use UTC to avoid timezone shifts
+  return date.toLocaleDateString('en-CA');
 }
 
 const optionTooltips: Record<string, string> = {
@@ -123,7 +124,7 @@ function getSubjectStatsUpToDate(
   };
 }
 
-// Tooltip Button (fixed position)
+// Tooltip Button
 const TooltipButton: React.FC<{
   children: React.ReactNode;
   tooltip: string;
@@ -267,7 +268,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       if (semData?.semester_start) setSemesterStartDate(new Date(semData.semester_start));
       if (semData?.semester_end) setSemesterEndDate(new Date(semData.semester_end));
 
-      // Fetch active slots
+      // Fetch active slots (including extra classes)
       const { data: slotsData } = await supabase
         .from('timetable_slots')
         .select('*')
@@ -275,7 +276,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         .eq('is_active', true);
       if (slotsData) setSlots(slotsData);
 
-      // Fetch logs for the month
+      // Fetch logs for the month (now includes slot_id)
       const { data: logsData } = await supabase
         .from('attendance_logs')
         .select('*')
@@ -313,21 +314,16 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (slotsData) setSlots(slotsData);
   };
 
-  // Action functions – using slot_id for new logs
-  const markSlot = async (slotId: string, date: Date, status: string) => {
+  // Action functions (now using slot_id)
+  const markSlot = async (slotId: string, subjectCode: string, date: Date, status: string) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
-    const slot = slots.find(s => s.id === slotId);
-    if (!slot) {
-      console.error('Slot not found');
-      return;
-    }
     await supabase
       .from('attendance_logs')
       .upsert({
         user_roll: user.roll_number,
         slot_id: slotId,
-        subject_code: slot.subject_code,
+        subject_code: subjectCode,
         log_date: dateStr,
         status,
       }, { onConflict: 'user_roll, slot_id, log_date' });
@@ -414,7 +410,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Holiday for the day – marks all subjects as holiday
+  // ✅ Holiday for the day – marks all slots as holiday
   const markDayAsHoliday = async (date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -472,7 +468,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       s.subject_code === subjectCode && s.specific_date === dateStr
     );
     if (existingSlot) {
-      // If exists, mark it as present
+      // If already exists, just mark present for that slot
       await supabase
         .from('attendance_logs')
         .upsert({
@@ -492,8 +488,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       alert('Subject not found in your timetable. Please add it in Timetable Builder first.');
       return;
     }
-    // Insert new extra slot
-    const { data: newSlot, error: insertError } = await supabase
+    const { data: newSlot, error } = await supabase
       .from('timetable_slots')
       .insert({
         user_roll: user.roll_number,
@@ -509,18 +504,19 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       })
       .select()
       .single();
-    if (insertError) {
-      console.error('Error inserting extra slot:', insertError);
-      alert('Failed to add extra class.');
+
+    if (error) {
+      console.error('Error adding extra class:', error);
+      alert('Failed to add extra class. Please try again.');
       return;
     }
-    // Mark as present
+    // Immediately mark as present for the new slot
     await supabase
       .from('attendance_logs')
       .upsert({
         user_roll: user.roll_number,
         slot_id: newSlot.id,
-        subject_code: sourceSlot.subject_code,
+        subject_code: subjectCode,
         log_date: dateStr,
         status: 'present',
       }, { onConflict: 'user_roll, slot_id, log_date' });
@@ -530,7 +526,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setShowExtraClassModal(false);
   };
 
-  const clearSlot = async (slotId: string, date: Date) => {
+  const clearSlot = async (slotId: string, subjectCode: string, date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     await supabase
@@ -543,11 +539,11 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Build calendar (using UTC to avoid timezone shifting)
+  // Build calendar using UTC to avoid timezone shift
   const buildCalendar = (): any[][] => {
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    const startDay = firstDayOfMonth.getUTCDay(); // 0=Sun
+    const firstDayOfMonth = new Date(Date.UTC(currentYear, currentMonth, 1));
+    const lastDayOfMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
+    const startDay = firstDayOfMonth.getUTCDay(); // 0=Sun, 6=Sat
     const daysInMonth = lastDayOfMonth.getUTCDate();
     const weeks: any[][] = [];
     let currentWeek: any[] = [];
@@ -555,7 +551,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     const todayStr = getLocalDateStr(today);
 
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(currentYear, currentMonth, d);
+      // Use UTC to create date at midnight UTC, then convert to local string for display
+      const date = new Date(Date.UTC(currentYear, currentMonth, d));
       const dayOfWeek = date.getUTCDay();
       const dateStr = getLocalDateStr(date);
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -564,16 +561,16 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       let isAfterSemesterEnd = false;
       if (semesterStartDate) {
         const semStart = new Date(semesterStartDate);
-        semStart.setUTCHours(0, 0, 0, 0);
+        semStart.setHours(0, 0, 0, 0);
         const dateCopy = new Date(date);
-        dateCopy.setUTCHours(0, 0, 0, 0);
+        dateCopy.setHours(0, 0, 0, 0);
         isBeforeSemesterStart = dateCopy < semStart;
       }
       if (semesterEndDate) {
         const semEnd = new Date(semesterEndDate);
-        semEnd.setUTCHours(0, 0, 0, 0);
+        semEnd.setHours(0, 0, 0, 0);
         const dateCopy = new Date(date);
-        dateCopy.setUTCHours(0, 0, 0, 0);
+        dateCopy.setHours(0, 0, 0, 0);
         isAfterSemesterEnd = dateCopy > semEnd;
       }
       const isOutsideSemester = isBeforeSemesterStart || isAfterSemesterEnd;
@@ -591,7 +588,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         daySlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
         daySlots.forEach(slot => {
           const log = allLogs.find(l => 
-            l.slot_id === slot.id && l.log_date === dateStr
+            l.slot_id === slot.id && 
+            l.log_date === dateStr
           );
           dayClasses.push({
             slot,
@@ -700,8 +698,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (!semesterStartDate) return true;
     const prevMonth = new Date(currentYear, currentMonth - 1, 1);
     const semStart = new Date(semesterStartDate);
-    semStart.setUTCDate(1);
-    semStart.setUTCHours(0, 0, 0, 0);
+    semStart.setDate(1);
+    semStart.setHours(0, 0, 0, 0);
     return prevMonth >= semStart;
   };
 
@@ -709,8 +707,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (!semesterEndDate) return true;
     const nextMonth = new Date(currentYear, currentMonth + 1, 1);
     const semEnd = new Date(semesterEndDate);
-    semEnd.setUTCDate(1);
-    semEnd.setUTCHours(0, 0, 0, 0);
+    semEnd.setDate(1);
+    semEnd.setHours(0, 0, 0, 0);
     return nextMonth <= semEnd;
   };
 
@@ -757,7 +755,6 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
@@ -906,23 +903,27 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                 return <div style={{ color: 'var(--text-secondary)' }}>No classes on this day.</div>;
               }
 
+              // Group by subject_code but keep slots separate for extra classes
               const subjectMap = new Map<string, any>();
               dayData.classes.forEach((cls: any) => {
                 const code = cls.slot.subject_code;
-                if (!subjectMap.has(code)) {
-                  subjectMap.set(code, {
+                // Create a unique key for each slot, but we want to show them separately if they are extra classes
+                const isExtra = cls.isExtraClass;
+                const key = isExtra ? `${code}-extra-${cls.slot.id}` : code;
+                if (!subjectMap.has(key)) {
+                  subjectMap.set(key, {
                     code,
-                    classes: [],
                     slot: cls.slot,
                     hasLog: false,
                     status: 'no_data',
                     startTime: cls.slot.start_time,
-                    isExtraClass: cls.isExtraClass,
+                    isExtraClass: isExtra,
+                    subjectName: cls.slot.subject_name,
+                    isLab: cls.slot.is_lab,
                   });
                 }
-                const entry = subjectMap.get(code);
-                entry.classes.push(cls);
-                if (cls.hasLog) entry.hasLog = true;
+                const entry = subjectMap.get(key);
+                entry.hasLog = entry.hasLog || cls.hasLog;
                 if (cls.status !== 'no_data') entry.status = cls.status;
               });
 
@@ -952,7 +953,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     )}
                   </div>
 
-                  {/* Quick Actions – includes Holiday button */}
+                  {/* Quick Actions */}
                   <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-xs font-medium mr-1" style={{ color: 'var(--text-secondary)' }}>⚡ Quick:</span>
@@ -987,34 +988,34 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     </div>
                   </div>
 
-                  {/* Subjects */}
+                  {/* Subjects – each slot separately */}
                   {subjects.map((subject: any) => {
-                    const isExpanded = expandedSubject === subject.code;
+                    const isExpanded = expandedSubject === `${subject.code}-${subject.slot.id}`;
                     const target = subjectTargets.get(subject.code) || globalTarget;
                     const stats = getSubjectStatsUpToDate(
                       subject.code,
                       allLogs,
                       selectedDay,
-                      subject.slot.subject_name,
-                      subject.slot.is_lab,
+                      subject.subjectName,
+                      subject.isLab,
                       target
                     );
                     const currentStatus = subject.status;
 
                     return (
                       <div
-                        key={subject.code}
+                        key={subject.slot.id}
                         className="rounded-lg overflow-hidden"
                         style={{ border: '1px solid var(--border)', backgroundColor: 'var(--surface)' }}
                       >
                         <div
                           className="flex items-center justify-between p-3 cursor-pointer hover:bg-opacity-5"
-                          onClick={() => setExpandedSubject(isExpanded ? null : subject.code)}
+                          onClick={() => setExpandedSubject(isExpanded ? null : `${subject.code}-${subject.slot.id}`)}
                           style={{ backgroundColor: 'var(--card)' }}
                         >
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{subject.code}</span>
-                            {subject.slot.is_lab && <span className="text-xs">🧪</span>}
+                            {subject.isLab && <span className="text-xs">🧪</span>}
                             {subject.isExtraClass && (
                               <span className="text-xs" style={{ color: 'var(--accent)' }}>➕ Extra</span>
                             )}
@@ -1099,13 +1100,13 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                                     tooltip={optionTooltips[option] || ''}
                                     onClick={() => {
                                       if (isClear) {
-                                        clearSlot(subject.slot.id, selectedDay);
+                                        clearSlot(subject.slot.id, subject.code, selectedDay);
                                         return;
                                       }
                                       if (option === 'holiday') {
                                         markDayHoliday(selectedDay, dayData.classes);
                                       } else {
-                                        markSlot(subject.slot.id, selectedDay, option);
+                                        markSlot(subject.slot.id, subject.code, selectedDay, option);
                                       }
                                     }}
                                     style={{
