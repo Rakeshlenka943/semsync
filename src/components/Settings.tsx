@@ -37,7 +37,7 @@ const AVATAR_COUNT = 8;
 const getAvatarPath = (id: number): string => `/avatars/avatar-${id}.svg`;
 
 export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
-  const { user, refreshUser } = useAuth(); // ← Added refreshUser
+  const { user, refreshUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [semesterDates, setSemesterDates] = useState<SemesterDates | null>(null);
   const [loading, setLoading] = useState(true);
@@ -185,22 +185,34 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     }
   };
 
-  // === AVATAR (with refreshUser) ===
+  // === AVATAR (Optimistic Update) ===
   const updateAvatar = async (avatarId: number) => {
     if (!user) return;
+    
+    // Optimistic: update UI immediately
+    setSelectedAvatar(avatarId);
+    if (profile) setProfile({ ...profile, avatar_id: avatarId });
     setAvatarSaving(true);
+
+    // Send to server
     const { error } = await supabase
       .from('users')
       .update({ avatar_id: avatarId })
       .eq('roll_number', user.roll_number);
-    if (!error) {
-      setSelectedAvatar(avatarId);
-      if (profile) setProfile({ ...profile, avatar_id: avatarId });
-      // Refresh the user object in AuthContext to update the header immediately
-      await refreshUser();
-    } else {
-      alert('Failed to update avatar.');
+
+    if (error) {
+      console.error('Avatar update error:', error);
+      alert('Failed to update avatar. Please try again.');
+      // Revert
+      const oldAvatar = profile?.avatar_id || 1;
+      setSelectedAvatar(oldAvatar);
+      if (profile) setProfile({ ...profile, avatar_id: oldAvatar });
+      setAvatarSaving(false);
+      return;
     }
+
+    // Refresh the user context to keep everything in sync
+    await refreshUser();
     setAvatarSaving(false);
   };
 
@@ -373,6 +385,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   src={getAvatarPath(selectedAvatar)}
                   alt="avatar"
                   className="w-full h-full object-cover"
+                  key={selectedAvatar} // force re-render on change
                 />
               </div>
               <div>
@@ -394,6 +407,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     src={getAvatarPath(id)}
                     alt={`Avatar ${id}`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </button>
               ))}
