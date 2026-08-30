@@ -14,7 +14,8 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: new Error('Invalid roll number') };
   }
 
-  const email = `${rollNumber}@gmail.com`;
+  // Use the user's email (we'll store it in the users table)
+  const email = `${rollNumber}@gmail.com`; // fallback, but we'll use the provided email from the form later
 
   // Clear any existing session
   await supabase.auth.signOut();
@@ -43,7 +44,7 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: authError };
   }
 
-  // The database trigger should create the profile row, but we'll fetch it
+  // Fetch the newly created user profile (trigger should have created it)
   const { data: userData, error: fetchError } = await supabase
     .from('users')
     .select('*')
@@ -60,141 +61,111 @@ export async function signUp(data: SignUpData) {
 
 export async function signIn(credentials: AuthCredentials) {
   const { username, rollNumber, password } = credentials;
-  
-  // Clear any stale session before attempting login
-  await supabase.auth.signOut();
-
-  let finalRollNumber: string | null = null;
+  let finalRollNumber: string | null = rollNumber || null;
+  let finalEmail: string | null = null;
   let needsRollNumber = false;
 
-  // 1. If roll number provided directly, use it
-  if (rollNumber) {
-    finalRollNumber = rollNumber;
-  } 
-  // 2. If username provided
-  else if (username) {
-    // Try to find by username in users table
-    const { data: users, error: queryError } = await supabase
+  // 1. If roll number is provided directly, use it
+  if (finalRollNumber) {
+    // Fetch the user's email from the users table
+    const { data: userData, error: fetchError } = await supabase
       .from('users')
-      .select('roll_number, username, email')
-      .eq('username', username);
+      .select('email')
+      .eq('roll_number', finalRollNumber)
+      .single();
 
-    if (queryError) {
-      console.error('Username lookup error:', queryError);
+    if (fetchError || !userData || !userData.email) {
+      return { user: null, error: new Error('User not found with this roll number.') };
+    }
+
+    finalEmail = userData.email;
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: finalEmail,
+      password,
+    });
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    // Fetch full profile
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('roll_number', finalRollNumber)
+      .single();
+
+    if (profileError) return { user: null, error: profileError };
+    return { user: profile as User, error: null };
+  }
+
+  // 2. If username or email provided
+  if (username) {
+    // Check if the identifier looks like an email
+    const isEmail = username.includes('@');
+
+    let query = supabase.from('users').select('roll_number, username, email');
+
+    if (isEmail) {
+      // Search by email
+      query = query.eq('email', username);
+    } else {
+      // Search by username
+      query = query.eq('username', username);
+    }
+
+    const { data: users, error } = await query;
+
+    if (error) {
+      console.error('User lookup error:', error);
       return { user: null, error: new Error('Database error. Please try again.') };
     }
 
     if (!users || users.length === 0) {
-      // Try to find by email (if username looks like an email)
-      const isEmail = username.includes('@');
-      if (isEmail) {
-        const { data: emailUsers, error: emailError } = await supabase
-          .from('users')
-          .select('roll_number')
-          .eq('email', username);
-        if (!emailError && emailUsers && emailUsers.length > 0) {
-          finalRollNumber = emailUsers[0].roll_number;
-        }
-      }
-      
-      if (!finalRollNumber) {
-        // Try to find in auth.users by email (fallback)
-        const { data: authUsers, error: authError } = await supabase
-          .from('auth.users')
-          .select('email')
-          .eq('email', username);
-        if (!authError && authUsers && authUsers.length > 0) {
-          // We don't have roll number, but we can attempt login with email
-          // We'll try to login directly with email and password
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: username,
-            password,
-          });
-          if (signInError) {
-            return { user: null, error: signInError };
-          }
-          // Fetch user profile from users table using the session's user metadata
-          const roll = signInData.user.user_metadata?.roll_number;
-          if (roll) {
-            finalRollNumber = roll;
-          } else {
-            return { user: null, error: new Error('User profile incomplete. Please contact support.') };
-          }
-        } else {
-          return { user: null, error: new Error('User not found. Please check your username/email.') };
-        }
-      }
-    } else if (users.length > 1) {
-      // Multiple users with same username -> need roll number
-      return { user: null, error: null, needsRollNumber: true };
-    } else {
-      // Exactly one user
-      finalRollNumber = users[0].roll_number;
+      return { user: null, error: new Error('User not found.') };
     }
-  } else {
-    return { user: null, error: new Error('Please provide username or roll number') };
-  }
 
-  // If we still don't have a roll number, fail
-  if (!finalRollNumber) {
-    return { user: null, error: new Error('Unable to resolve user. Please try again.') };
-  }
+    if (users.length > 1) {
+      // Multiple users with same username (should only happen if searching by username)
+      return { user: null, error: null, needsRollNumber: true };
+    }
 
-  // Get the email from the users table (or use the roll number to construct it)
-  const { data: userProfile, error: profileError } = await supabase
-    .from('users')
-    .select('email')
-    .eq('roll_number', finalRollNumber)
-    .single();
+    // Exactly one user found
+    const user = users[0];
+    finalRollNumber = user.roll_number;
+    finalEmail = user.email;
 
-  let authEmail = userProfile?.email || `${finalRollNumber}@gmail.com`;
+    if (!finalEmail) {
+      // Fallback: build email from roll number (should not happen)
+      finalEmail = `${finalRollNumber}@gmail.com`;
+    }
 
-  // Attempt sign in
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-    email: authEmail,
-    password,
-  });
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: finalEmail,
+      password,
+    });
 
-  if (signInError) {
-    // If login fails, maybe the email is wrong; try fallback
-    if (signInError.message.includes('Invalid login credentials')) {
-      // Try constructing email from roll number
-      const fallbackEmail = `${finalRollNumber}@gmail.com`;
-      if (fallbackEmail !== authEmail) {
-        const { error: retryError } = await supabase.auth.signInWithPassword({
-          email: fallbackEmail,
-          password,
-        });
-        if (!retryError) {
-          authEmail = fallbackEmail;
-        } else {
-          return { user: null, error: retryError };
-        }
-      } else {
-        return { user: null, error: signInError };
-      }
-    } else {
+    if (signInError) {
       return { user: null, error: signInError };
     }
+
+    // Fetch full profile
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('roll_number', finalRollNumber)
+      .single();
+
+    if (profileError) return { user: null, error: profileError };
+    return { user: profile as User, error: null };
   }
 
-  // Fetch full user profile
-  const { data: userData, error: fetchError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('roll_number', finalRollNumber)
-    .single();
-
-  if (fetchError) {
-    console.error('Fetch profile error:', fetchError);
-    return { user: null, error: new Error('User profile not found. Please contact support.') };
-  }
-
-  return { user: userData as User, error: null };
+  return { user: null, error: new Error('Please provide username, email, or roll number.') };
 }
 
-export async function signOut() { 
-  return supabase.auth.signOut(); 
+export async function signOut() {
+  return supabase.auth.signOut();
 }
 
 export async function getCurrentUser() {
