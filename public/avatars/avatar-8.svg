@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Dark Grey to Black Gradient -->
+    <linearGradient id="darkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A4A4A" /> <!-- Dark Grey -->
+      <stop offset="100%" stop-color="#050505" /> <!-- Black -->
+    </linearGradient>
+  </defs>
+  
+  <!-- Circular Avatar Background -->
+  <circle cx="50" cy="50" r="50" fill="url(#darkGradient)" />
+  
+  <!-- Minimalist White Compass Icon -->
+  <g transform="translate(50 50)">
+    <!-- Outer Ring -->
+    <circle cx="0" cy="0" r="18" fill="none" stroke="#FFFFFF" stroke-width="3" />
+    
+    <!-- Directional Ticks (N, S, E, W) -->
+    <rect x="-1.5" y="-23" width="3" height="5" fill="#FFFFFF" rx="1" />
+    <rect x="-1.5" y="18" width="3" height="5" fill="#FFFFFF" rx="1" />
+    <rect x="-23" y="-1.5" width="5" height="3" fill="#FFFFFF" rx="1" />
+    <rect x="18" y="-1.5" width="5" height="3" fill="#FFFFFF" rx="1" />
+    
+    <!-- Central Compass Needle -->
+    <polygon points="0,-14 4.5,0 0,14 -4.5,0" fill="#FFFFFF" />
+  </g>
+</svg>

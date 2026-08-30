@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Rich Cobalt Blue to Indigo Gradient -->
+    <linearGradient id="cobaltIndigoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0059B3" /> <!-- Cobalt Blue -->
+      <stop offset="100%" stop-color="#5A30B5" /> <!-- Indigo -->
+    </linearGradient>
+  </defs>
+  
+  <!-- Circular Avatar Background with Gradient -->
+  <circle cx="50" cy="50" r="50" fill="url(#cobaltIndigoGradient)" />
+  
+  <!-- Small, Minimal, Solid White Lightning Bolt Icon (Centered) -->
+  <path d="M 50,30 L 62,45 L 50,50 L 58,70 L 42,75 L 46,55 L 38,40 Z" fill="#FFFFFF" />
+</svg>

@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Calendar, Database, Shield, 
   CheckCircle, AlertTriangle, Download, Upload, 
   X, Loader2, Lock, Target, ChevronRight, BookOpen,
-  Edit2, Save
+  Edit2, Save, Image
 } from 'lucide-react';
 
 interface SettingsProps {
@@ -19,6 +19,7 @@ interface UserProfile {
   academic_cycle: 'physics' | 'chemistry' | null;
   attendance_target: number;
   semester_transitioned: boolean;
+  avatar_id: number;
 }
 
 interface SemesterDates {
@@ -31,6 +32,10 @@ interface SubjectTarget {
   subject_name: string;
   target_percentage: number;
 }
+
+// Avatar mapping
+const AVATAR_COUNT = 8;
+const getAvatarPath = (id: number): string => `/avatars/avatar-${id}.svg`;
 
 export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const { user } = useAuth();
@@ -48,6 +53,8 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<number>(1);
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   // Semester transition state
   const [showTransitionModal, setShowTransitionModal] = useState(false);
@@ -69,12 +76,13 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const fetchProfile = async () => {
     const { data, error } = await supabase
       .from('users')
-      .select('username, email, batch_badge, academic_cycle, attendance_target, semester_transitioned')
+      .select('username, email, batch_badge, academic_cycle, attendance_target, semester_transitioned, avatar_id')
       .eq('roll_number', user?.roll_number)
       .single();
     if (!error && data) {
       setProfile(data);
       setTarget(data.attendance_target || 75);
+      setSelectedAvatar(data.avatar_id || 1);
     }
   };
 
@@ -92,13 +100,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   const fetchSubjectTargets = async () => {
     if (!user) return;
-    // Fetch existing subject targets
     const { data: targets, error } = await supabase
       .from('subject_attendance_targets')
       .select('*')
       .eq('user_roll', user.roll_number);
 
-    // Fetch active subjects from timetable
     const { data: slots } = await supabase
       .from('timetable_slots')
       .select('subject_code, subject_name')
@@ -107,7 +113,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
     if (!slots) return;
 
-    // Deduplicate subjects
     const uniqueSubjects = Array.from(
       new Map(slots.map(s => [s.subject_code, s])).values()
     );
@@ -179,6 +184,25 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
       setConfirmPassword('');
       setTimeout(() => setPasswordSuccess(false), 3000);
     }
+  };
+
+  // === AVATAR ===
+  const updateAvatar = async (avatarId: number) => {
+    if (!user) return;
+    setAvatarSaving(true);
+    const { error } = await supabase
+      .from('users')
+      .update({ avatar_id: avatarId })
+      .eq('roll_number', user.roll_number);
+    if (!error) {
+      setSelectedAvatar(avatarId);
+      // Update local profile
+      if (profile) setProfile({ ...profile, avatar_id: avatarId });
+      // Also update user object in AuthContext? We'll refetch on next load.
+    } else {
+      alert('Failed to update avatar.');
+    }
+    setAvatarSaving(false);
   };
 
   // === SEMESTER TRANSITION ===
@@ -295,7 +319,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 rounded hover:bg-opacity-10" style={{ color: 'var(--text-primary)' }}>
           <ArrowLeft size={24} />
@@ -303,7 +326,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>⚙️ Settings & Account</h1>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b" style={{ borderColor: 'var(--border)' }}>
         {[
           { id: 'general', label: 'General', icon: User },
@@ -328,7 +350,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         })}
       </div>
 
-      {/* === TAB: GENERAL === */}
       {activeTab === 'general' && (
         <div className="space-y-6">
           {/* Profile Info */}
@@ -339,6 +360,44 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               <p><strong>Email:</strong> {profile?.email}</p>
               <p><strong>Batch:</strong> {profile?.batch_badge}</p>
               <p><strong>Cycle:</strong> {profile?.academic_cycle}</p>
+            </div>
+          </div>
+
+          {/* Profile Picture */}
+          <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
+            <h3 className="font-semibold flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
+              <Image size={18} /> Profile Picture
+            </h3>
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2" style={{ borderColor: 'var(--accent)' }}>
+                <img
+                  src={getAvatarPath(selectedAvatar)}
+                  alt="avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Choose a style:</p>
+                {avatarSaving && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Saving...</span>}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+              {Array.from({ length: AVATAR_COUNT }, (_, i) => i + 1).map((id) => (
+                <button
+                  key={id}
+                  onClick={() => updateAvatar(id)}
+                  className={`w-full aspect-square rounded-full overflow-hidden border-2 transition ${
+                    selectedAvatar === id ? 'border-accent ring-2 ring-accent ring-offset-2' : 'border-transparent'
+                  }`}
+                  style={{ borderColor: selectedAvatar === id ? 'var(--accent)' : 'var(--border)' }}
+                >
+                  <img
+                    src={getAvatarPath(id)}
+                    alt={`Avatar ${id}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
             </div>
           </div>
 
@@ -371,7 +430,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Per-Subject Attendance Targets */}
+          {/* Per-Subject Targets */}
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
               <BookOpen size={18} /> Subject-Specific Targets
@@ -496,7 +555,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* === TAB: SEMESTER === */}
       {activeTab === 'semester' && (
         <div className="space-y-6">
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
@@ -537,7 +595,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* === TAB: DATA === */}
       {activeTab === 'data' && (
         <div className="space-y-6">
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
@@ -604,7 +661,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* === TRANSITION MODAL === */}
+      {/* Transition Modal */}
       {showTransitionModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"

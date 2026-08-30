@@ -19,6 +19,14 @@ function getSemesterInfo(startDate: Date | null): string {
   return `${year}${suffix} Year, Sem ${semester}`;
 }
 
+// Map avatar_id to image path
+const getAvatarPath = (id: number): string => {
+  if (id >= 1 && id <= 8) {
+    return `/avatars/avatar-${id}.svg`;
+  }
+  return `/avatars/avatar-1.svg`;
+};
+
 export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate, isAdmin }) => {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -58,6 +66,9 @@ export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate, i
     navItems.push({ id: 'admin', label: 'Admin', icon: Shield });
   }
 
+  const avatarId = user?.avatar_id || 1;
+  const avatarSrc = getAvatarPath(avatarId);
+
   return (
     <>
       <header className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}>
@@ -67,8 +78,23 @@ export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate, i
         <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>SemSync</h1>
         <div className="flex items-center gap-2">
           <span className="text-sm hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>{user?.username}</span>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: 'var(--accent)', color: '#fff' }}>
-            {user?.username?.charAt(0).toUpperCase()}
+          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center border" style={{ borderColor: 'var(--border)' }}>
+            <img
+              src={avatarSrc}
+              alt="avatar"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to initial if image fails
+                (e.target as HTMLImageElement).style.display = 'none';
+                const parent = (e.target as HTMLImageElement).parentElement;
+                if (parent) {
+                  parent.style.backgroundColor = 'var(--accent)';
+                  parent.style.color = '#fff';
+                  parent.style.fontWeight = 'bold';
+                  parent.textContent = user?.username?.charAt(0).toUpperCase() || '?';
+                }
+              }}
+            />
           </div>
         </div>
       </header>
@@ -77,8 +103,29 @@ export const GlobalNav: React.FC<GlobalNavProps> = ({ currentPage, onNavigate, i
         <div className="fixed inset-0 z-50" style={{ backgroundColor: 'rgba(44, 37, 32, 0.3)' }} onClick={() => setMenuOpen(false)}>
           <div className="w-80 h-full p-4 overflow-y-auto shadow-xl" style={{ backgroundColor: 'var(--card)', color: 'var(--text-primary)', borderRight: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 pb-4 border-b" style={{ borderColor: 'var(--border)' }}>
-              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{user?.username}</p>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{user?.batch_badge}</p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border" style={{ borderColor: 'var(--border)' }}>
+                  <img
+                    src={avatarSrc}
+                    alt="avatar"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent) {
+                        parent.style.backgroundColor = 'var(--accent)';
+                        parent.style.color = '#fff';
+                        parent.style.fontWeight = 'bold';
+                        parent.textContent = user?.username?.charAt(0).toUpperCase() || '?';
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{user?.username}</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{user?.batch_badge}</p>
+                </div>
+              </div>
               <p className="text-xs mt-1" style={{ color: 'var(--accent)' }}>📚 {semesterInfo}</p>
             </div>
             <ul className="space-y-1">

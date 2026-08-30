@@ -10,6 +10,8 @@ export type User = {
   faculty_vote_ledger: Record<string, number>;
   agreed_to_whisper: boolean;
   attendance_target: number;
+  is_admin?: boolean;
+  avatar_id: number;      // ← NEW
   created_at: string;
 };
 
@@ -53,7 +55,7 @@ export type Deadline = {
   id: string;
   user_roll: string;
   subject_name: string;
-  bounty_type: 'assignment' | 'quiz';
+  bounty_type: 'assignment' | 'quiz' | 'project' | 'custom';
   due_date: string;
   description: string | null;
   is_completed: boolean;

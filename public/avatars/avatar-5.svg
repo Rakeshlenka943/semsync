@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Gentle Peach-Coral Gradient Definition -->
+    <linearGradient id="peachCoralGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFDAB9" /> <!-- Peach (PeachPuff) -->
+      <stop offset="100%" stop-color="#FF7F50" /> <!-- Coral -->
+    </linearGradient>
+  </defs>
+  
+  <!-- Circular Avatar Background with Peach-Coral Gradient -->
+  <circle cx="50" cy="50" r="50" fill="url(#peachCoralGradient)" />
+  
+  <!-- Small, Minimal, Solid White Asterisk/Star Icon (Centered) -->
+  <g transform="translate(50 50)">
+    <!-- Asterisk bars made of intersecting rectangles with rounded corners for a clean, modern look -->
+    <rect x="-14" y="-2" width="28" height="4" rx="2" fill="#FFFFFF" />
+    <rect x="-14" y="-2" width="28" height="4" rx="2" fill="#FFFFFF" transform="rotate(45)" />
+    <rect x="-14" y="-2" width="28" height="4" rx="2" fill="#FFFFFF" transform="rotate(90)" />
+    <rect x="-14" y="-2" width="28" height="4" rx="2" fill="#FFFFFF" transform="rotate(135)" />
+  </g>
+</svg>

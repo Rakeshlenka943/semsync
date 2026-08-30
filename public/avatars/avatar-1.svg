@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Warm Sunset Gradient Definition: Orange to Pink -->
+    <linearGradient id="sunsetGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF9D5C" /> <!-- Orange -->
+      <stop offset="100%" stop-color="#FF6397" /> <!-- Pink -->
+    </linearGradient>
+  </defs>
+  
+  <!-- Circular Avatar Background with Sunset Gradient -->
+  <circle cx="50" cy="50" r="50" fill="url(#sunsetGradient)" />
+  
+  <!-- Minimalist White Sun Icon -->
+  <g transform="translate(50 50)">
+    <!-- Central Circle of the Sun -->
+    <circle cx="0" cy="0" r="14" fill="white" />
+    
+    <!-- 8 Minimalist Rays around the Circle -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" /> <!-- Top -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(45)" /> <!-- Top-Right -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(90)" /> <!-- Right -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(135)" /> <!-- Bottom-Right -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(180)" /> <!-- Bottom -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(225)" /> <!-- Bottom-Left -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(270)" /> <!-- Left -->
+    <rect x="-2" y="-32" width="4" height="12" rx="2" fill="white" transform="rotate(315)" /> <!-- Top-Left -->
+  </g>
+</svg>

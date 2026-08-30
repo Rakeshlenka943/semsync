@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Deep Blue to Teal Gradient -->
+    <linearGradient id="oceanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#122B59" /> <!-- Deep Blue -->
+      <stop offset="100%" stop-color="#00A896" /> <!-- Teal -->
+    </linearGradient>
+  </defs>
+  
+  <!-- Circular Avatar Background -->
+  <circle cx="50" cy="50" r="50" fill="url(#oceanGradient)" />
+  
+  <!-- Minimalist White Water Droplet -->
+  <path d="M50 23 C50 23 68 45 68 59 A18 18 0 0 1 32 59 C32 45 50 23 50 23 Z" fill="white" />
+</svg>
