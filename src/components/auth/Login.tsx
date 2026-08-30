@@ -49,7 +49,7 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
-            {needsRollNumber ? 'Enter your Roll Number' : 'Username, Email, or Roll Number'}
+            {needsRollNumber ? 'Enter your Roll Number' : 'Username or Roll Number'}
           </label>
           {needsRollNumber ? (
             <>
@@ -83,7 +83,7 @@ export const Login: React.FC<LoginProps> = ({ onForgotPassword }) => {
                 color: 'var(--text-primary)',
               }}
               required
-              placeholder="username, email, or roll number"
+              placeholder="username or roll number"
             />
           )}
         </div>

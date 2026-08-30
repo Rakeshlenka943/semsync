@@ -14,10 +14,8 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: new Error('Invalid roll number') };
   }
 
-  // Use rollNumber as email for auth
   const email = `${rollNumber}@gmail.com`;
 
-  // Clear any existing session
   await supabase.auth.signOut();
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -44,7 +42,6 @@ export async function signUp(data: SignUpData) {
     return { user: null, error: authError };
   }
 
-  // Insert profile into users table
   const { data: userData, error: insertError } = await supabase
     .from('users')
     .insert({
@@ -77,7 +74,7 @@ export async function signIn(credentials: AuthCredentials) {
   let authEmail: string | null = null;
   let needsRollNumber = false;
 
-  // 1. If roll number is provided directly – use it
+  // 1. If roll number is provided – use it
   if (finalRollNumber) {
     authEmail = `${finalRollNumber}@gmail.com`;
     
@@ -87,14 +84,12 @@ export async function signIn(credentials: AuthCredentials) {
     });
 
     if (error) {
-      // Check if error is due to user not found
       if (error.message?.includes('Invalid login credentials')) {
         return { user: null, error: new Error('Invalid roll number or password.') };
       }
       return { user: null, error };
     }
 
-    // Fetch profile
     const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('*')
@@ -102,25 +97,17 @@ export async function signIn(credentials: AuthCredentials) {
       .single();
 
     if (profileError) {
-      // Profile might not exist yet, but auth succeeded
-      return { user: null, error: new Error('Profile not found. Please contact support.') };
+      return { user: null, error: new Error('Profile not found.') };
     }
     return { user: profile as User, error: null };
   }
 
-  // 2. If username or email provided
+  // 2. If username provided (email login removed)
   if (username) {
-    const isEmail = username.includes('@');
-
-    let query = supabase.from('users').select('roll_number, email');
-
-    if (isEmail) {
-      query = query.eq('email', username);
-    } else {
-      query = query.eq('username', username);
-    }
-
-    const { data: users, error } = await query;
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('roll_number, email')
+      .eq('username', username);
 
     if (error) {
       console.error('User lookup error:', error);
@@ -135,7 +122,6 @@ export async function signIn(credentials: AuthCredentials) {
       return { user: null, error: null, needsRollNumber: true };
     }
 
-    // Exactly one user found
     const user = users[0];
     finalRollNumber = user.roll_number;
     authEmail = user.email || `${finalRollNumber}@gmail.com`;
@@ -147,12 +133,11 @@ export async function signIn(credentials: AuthCredentials) {
 
     if (signInError) {
       if (signInError.message?.includes('Invalid login credentials')) {
-        return { user: null, error: new Error('Invalid username/email or password.') };
+        return { user: null, error: new Error('Invalid username or password.') };
       }
       return { user: null, error: signInError };
     }
 
-    // Fetch full profile
     const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('*')
@@ -163,7 +148,7 @@ export async function signIn(credentials: AuthCredentials) {
     return { user: profile as User, error: null };
   }
 
-  return { user: null, error: new Error('Please provide username, email, or roll number.') };
+  return { user: null, error: new Error('Please provide username or roll number.') };
 }
 
 export async function signOut() {
@@ -182,7 +167,7 @@ export async function getCurrentUser() {
 }
 
 export async function resetPassword(email: string) {
-  // First, find the user's auth email from the users table
+  // Find the user's auth email from the users table
   const { data: userData, error: findError } = await supabase
     .from('users')
     .select('email')
@@ -190,7 +175,7 @@ export async function resetPassword(email: string) {
     .single();
 
   if (findError || !userData?.email) {
-    // If not found by email, try to find by roll number (if input is roll number)
+    // If not found by email, try by roll number
     if (/^\d{8}$/.test(email)) {
       const { data: userByRoll } = await supabase
         .from('users')
@@ -208,8 +193,11 @@ export async function resetPassword(email: string) {
     return { error: null };
   }
 
+  // Use the actual deployment URL (window.location.origin)
+  const redirectUrl = window.location.origin + '/reset-password';
+  
   const { error } = await supabase.auth.resetPasswordForEmail(userData.email, {
-    redirectTo: window.location.origin + '/reset-password',
+    redirectTo: redirectUrl,
   });
   return { error };
 }
