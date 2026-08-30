@@ -102,7 +102,7 @@ export async function signIn(credentials: AuthCredentials) {
     return { user: profile as User, error: null };
   }
 
-  // 2. If username provided (email login removed)
+  // 2. If username provided
   if (username) {
     const { data: users, error } = await supabase
       .from('users')
@@ -166,37 +166,37 @@ export async function getCurrentUser() {
   return { user: userData as User | null, error };
 }
 
-export async function resetPassword(email: string) {
+export async function resetPassword(identifier: string) {
   // Find the user's auth email from the users table
-  const { data: userData, error: findError } = await supabase
+  let email: string | null = null;
+  
+  // Try by email (if user enters email)
+  const { data: userByEmail } = await supabase
     .from('users')
     .select('email')
-    .eq('email', email)
+    .eq('email', identifier)
     .single();
-
-  if (findError || !userData?.email) {
-    // If not found by email, try by roll number
-    if (/^\d{8}$/.test(email)) {
-      const { data: userByRoll } = await supabase
-        .from('users')
-        .select('email')
-        .eq('roll_number', email)
-        .single();
-      if (userByRoll?.email) {
-        const { error } = await supabase.auth.resetPasswordForEmail(userByRoll.email, {
-          redirectTo: window.location.origin + '/reset-password',
-        });
-        return { error };
-      }
-    }
+  if (userByEmail?.email) email = userByEmail.email;
+  
+  // If not found, try by roll number
+  if (!email && /^\d{8}$/.test(identifier)) {
+    const { data: userByRoll } = await supabase
+      .from('users')
+      .select('email')
+      .eq('roll_number', identifier)
+      .single();
+    if (userByRoll?.email) email = userByRoll.email;
+  }
+  
+  if (!email) {
     // Return success even if not found (security best practice)
     return { error: null };
   }
-
-  // Use the actual deployment URL (window.location.origin)
+  
+  // Build redirect URL – uses the current window origin (will be Vercel URL in production)
   const redirectUrl = window.location.origin + '/reset-password';
   
-  const { error } = await supabase.auth.resetPasswordForEmail(userData.email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: redirectUrl,
   });
   return { error };
