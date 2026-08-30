@@ -46,7 +46,7 @@ interface SubjectAttendanceStats {
 }
 
 function getLocalDateStr(date: Date): string {
-  return date.toLocaleDateString('en-CA');
+  return date.toISOString().split('T')[0]; // Use UTC to avoid timezone shifts
 }
 
 const optionTooltips: Record<string, string> = {
@@ -313,12 +313,15 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (slotsData) setSlots(slotsData);
   };
 
-  // Action functions – using slot_id
+  // Action functions – using slot_id for new logs
   const markSlot = async (slotId: string, date: Date, status: string) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     const slot = slots.find(s => s.id === slotId);
-    if (!slot) return;
+    if (!slot) {
+      console.error('Slot not found');
+      return;
+    }
     await supabase
       .from('attendance_logs')
       .upsert({
@@ -411,6 +414,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
+  // Holiday for the day – marks all subjects as holiday
   const markDayAsHoliday = async (date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -464,12 +468,11 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     const dayOfWeek = date.getDay();
-    // Check if there's already an extra slot for this subject on this date
     const existingSlot = slots.find(s => 
       s.subject_code === subjectCode && s.specific_date === dateStr
     );
     if (existingSlot) {
-      // If exists, just mark it as present
+      // If exists, mark it as present
       await supabase
         .from('attendance_logs')
         .upsert({
@@ -540,12 +543,12 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Build calendar (timezone-safe)
+  // Build calendar (using UTC to avoid timezone shifting)
   const buildCalendar = (): any[][] => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    const startDay = firstDayOfMonth.getDay();
-    const daysInMonth = lastDayOfMonth.getDate();
+    const startDay = firstDayOfMonth.getUTCDay(); // 0=Sun
+    const daysInMonth = lastDayOfMonth.getUTCDate();
     const weeks: any[][] = [];
     let currentWeek: any[] = [];
     const today = new Date();
@@ -553,7 +556,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
 
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(currentYear, currentMonth, d);
-      const dayOfWeek = date.getDay();
+      const dayOfWeek = date.getUTCDay();
       const dateStr = getLocalDateStr(date);
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
@@ -561,16 +564,16 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       let isAfterSemesterEnd = false;
       if (semesterStartDate) {
         const semStart = new Date(semesterStartDate);
-        semStart.setHours(0, 0, 0, 0);
+        semStart.setUTCHours(0, 0, 0, 0);
         const dateCopy = new Date(date);
-        dateCopy.setHours(0, 0, 0, 0);
+        dateCopy.setUTCHours(0, 0, 0, 0);
         isBeforeSemesterStart = dateCopy < semStart;
       }
       if (semesterEndDate) {
         const semEnd = new Date(semesterEndDate);
-        semEnd.setHours(0, 0, 0, 0);
+        semEnd.setUTCHours(0, 0, 0, 0);
         const dateCopy = new Date(date);
-        dateCopy.setHours(0, 0, 0, 0);
+        dateCopy.setUTCHours(0, 0, 0, 0);
         isAfterSemesterEnd = dateCopy > semEnd;
       }
       const isOutsideSemester = isBeforeSemesterStart || isAfterSemesterEnd;
@@ -697,8 +700,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (!semesterStartDate) return true;
     const prevMonth = new Date(currentYear, currentMonth - 1, 1);
     const semStart = new Date(semesterStartDate);
-    semStart.setDate(1);
-    semStart.setHours(0, 0, 0, 0);
+    semStart.setUTCDate(1);
+    semStart.setUTCHours(0, 0, 0, 0);
     return prevMonth >= semStart;
   };
 
@@ -706,8 +709,8 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (!semesterEndDate) return true;
     const nextMonth = new Date(currentYear, currentMonth + 1, 1);
     const semEnd = new Date(semesterEndDate);
-    semEnd.setDate(1);
-    semEnd.setHours(0, 0, 0, 0);
+    semEnd.setUTCDate(1);
+    semEnd.setUTCHours(0, 0, 0, 0);
     return nextMonth <= semEnd;
   };
 
