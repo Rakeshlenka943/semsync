@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { supabase } from './lib/supabase';  // ✅ ADDED THIS IMPORT
+import { supabase } from './lib/supabase';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -18,6 +18,7 @@ import { WhisperNetwork } from './components/WhisperNetwork';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Settings } from './components/Settings';
 import { GlobalNav } from './components/GlobalNav';
+import { useInactivityLogout } from './hooks/useInactivityLogout';
 
 type Page = 'dashboard' | 'timetable' | 'heatmap' | 'syllabus' | 'deadlines' | 'exams' | 'semester' | 'whisper' | 'theme' | 'settings' | 'admin';
 
@@ -29,6 +30,9 @@ function AppContent() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Auto‑logout after 6 hours of inactivity
+  useInactivityLogout(6 * 60);
+
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes('access_token')) {
@@ -38,7 +42,6 @@ function AppContent() {
 
   useEffect(() => {
     if (user) {
-      // Check if user is admin
       supabase
         .from('users')
         .select('is_admin')

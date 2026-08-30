@@ -255,13 +255,11 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
                     <div className="flex items-center gap-4 mt-1 text-sm">
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Theory:</span>
-                        <span style={{ color: 'var(--text-primary)' }}>{getStarDisplay(theoryAvg)}</span>
-                        <span style={{ color: 'var(--text-secondary)' }}>{theoryAvg.toFixed(1)}</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{theoryAvg.toFixed(1)}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Lab:</span>
-                        <span style={{ color: 'var(--text-primary)' }}>{getStarDisplay(labAvg)}</span>
-                        <span style={{ color: 'var(--text-secondary)' }}>{labAvg.toFixed(1)}</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{labAvg.toFixed(1)}</span>
                       </div>
                     </div>
                   </div>
@@ -273,7 +271,7 @@ export const WhisperNetwork: React.FC<WhisperNetworkProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Faculty Detail Modal */}
+      {/* Faculty Detail Modal (unchanged, keeps stars) */}
       {selectedFaculty && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"

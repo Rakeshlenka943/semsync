@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, X, Edit3, Save, Check } from 'lucide-react';
+import { ArrowLeft, X, Edit3, Save, Check, Plus } from 'lucide-react';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface TimetableBuilderProps {
   onBack: () => void;
@@ -70,12 +71,16 @@ const getSubjectsForCycle = (cycle: string): Subject[] => {
 
 export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) => {
   const { user } = useAuth();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [dragSubject, setDragSubject] = useState<Subject | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
+  const [selectedDayForAdd, setSelectedDayForAdd] = useState<number | null>(null);
+  const [selectedHourForAdd, setSelectedHourForAdd] = useState<number | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -150,6 +155,7 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
     return null;
   };
 
+  // Desktop drag-drop
   const handleDrop = (e: React.DragEvent, day: number, hour: number) => {
     e.preventDefault();
     if (!isEditing || !dragSubject) return;
@@ -173,6 +179,38 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
   };
 
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+
+  // Mobile: open add modal
+  const openAddModal = (day: number, hour: number) => {
+    if (!isEditing) return;
+    setSelectedDayForAdd(day);
+    setSelectedHourForAdd(hour);
+    setShowAddModal(true);
+  };
+
+  const addSlotFromModal = (subject: Subject) => {
+    if (selectedDayForAdd === null || selectedHourForAdd === null) return;
+    const error = validateDrop(selectedDayForAdd, selectedHourForAdd, subject);
+    if (error) {
+      setDropError(error);
+      setTimeout(() => setDropError(null), 3000);
+      return;
+    }
+    const duration = subject.is_lab ? 3 : 1;
+    const newSlot: Slot = {
+      day_of_week: selectedDayForAdd,
+      start_hour: selectedHourForAdd,
+      end_hour: selectedHourForAdd + duration,
+      subject_code: subject.code,
+      subject_name: subject.name,
+      is_lab: subject.is_lab,
+    };
+    setSlots([...slots, newSlot]);
+    setShowAddModal(false);
+    setSelectedDayForAdd(null);
+    setSelectedHourForAdd(null);
+    setDragSubject(null);
+  };
 
   const removeSlot = (slotToRemove: Slot) => {
     if (!isEditing) return;
@@ -243,9 +281,10 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
           {theorySubjects.map((subj) => (
             <div
               key={subj.code}
-              draggable={isEditing}
-              onDragStart={() => { if (isEditing) setDragSubject(subj); }}
-              className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-default opacity-60'}`}
+              draggable={isEditing && !isMobile}
+              onDragStart={() => { if (isEditing && !isMobile) setDragSubject(subj); }}
+              onClick={() => { if (isEditing && isMobile && showAddModal) { /* handled in modal */ } }}
+              className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition ${isEditing ? (isMobile ? 'cursor-pointer hover:scale-105' : 'cursor-grab hover:scale-105') : 'cursor-default opacity-60'}`}
               style={{
                 backgroundColor: dragSubject?.code === subj.code ? 'var(--accent)' : 'var(--accent-light)',
                 color: dragSubject?.code === subj.code ? '#fff' : 'var(--text-primary)',
@@ -260,9 +299,10 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
           {labSubjects.map((subj) => (
             <div
               key={subj.code}
-              draggable={isEditing}
-              onDragStart={() => { if (isEditing) setDragSubject(subj); }}
-              className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-default opacity-60'}`}
+              draggable={isEditing && !isMobile}
+              onDragStart={() => { if (isEditing && !isMobile) setDragSubject(subj); }}
+              onClick={() => { if (isEditing && isMobile && showAddModal) { /* handled in modal */ } }}
+              className={`px-3 py-1.5 rounded flex items-center gap-2 text-sm transition ${isEditing ? (isMobile ? 'cursor-pointer hover:scale-105' : 'cursor-grab hover:scale-105') : 'cursor-default opacity-60'}`}
               style={{
                 backgroundColor: dragSubject?.code === subj.code ? 'var(--accent)' : 'var(--surface)',
                 color: dragSubject?.code === subj.code ? '#fff' : 'var(--text-primary)',
@@ -277,7 +317,7 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
         </div>
         {isEditing && (
           <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            💡 Drag a subject onto the grid {dragSubject ? `· Selected: ${dragSubject.code}` : ''}
+            {isMobile ? 'Tap a time slot to add a subject' : 'Drag a subject onto the grid'} {dragSubject ? `· Selected: ${dragSubject.code}` : ''}
           </div>
         )}
         {!isEditing && (
@@ -285,85 +325,196 @@ export const TimetableBuilder: React.FC<TimetableBuilderProps> = ({ onBack }) =>
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--border)' }}>
-        <table className="w-full border-collapse text-sm" style={{ backgroundColor: 'var(--bg)', minWidth: '700px' }}>
-          <thead>
-            <tr>
-              <th className="p-2 font-semibold text-center" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', minWidth: '80px' }}>Day / Time</th>
-              {HOURS.map((hour) => (
-                <th key={hour} className="p-2 text-center font-medium" style={{ color: hour >= LUNCH_START && hour < LUNCH_END ? 'var(--warning)' : 'var(--text-primary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', minWidth: '60px' }}>
-                  {formatHour(hour)}
-                  {hour >= LUNCH_START && hour < LUNCH_END && ' 🍽️'}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {DAYS.map((day, dayIdx) => {
-              const dayNum = dayIdx + 1;
-              return (
-                <tr key={day}>
-                  <td className="p-2 font-medium text-center" style={{ color: 'var(--text-primary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>{day}</td>
-                  {HOURS.map((hour) => {
-                    const slot = getSlotsAtHour(dayNum, hour);
-                    const isLunch = hour >= LUNCH_START && hour < LUNCH_END;
-                    const isStartOfSlot = slot && slot.start_hour === hour;
-                    const isInsideSlot = slot && slot.start_hour < hour && slot.end_hour > hour;
-                    const isDragTarget = dragSubject && !slot && !isLunch && isEditing;
+      {/* Timetable Grid – Desktop: full table, Mobile: day view */}
+      {!isMobile ? (
+        <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--border)' }}>
+          <table className="w-full border-collapse text-sm" style={{ backgroundColor: 'var(--bg)', minWidth: '700px' }}>
+            <thead>
+              <tr>
+                <th className="p-2 font-semibold text-center" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', minWidth: '80px' }}>Day / Time</th>
+                {HOURS.map((hour) => (
+                  <th key={hour} className="p-2 text-center font-medium" style={{ color: hour >= LUNCH_START && hour < LUNCH_END ? 'var(--warning)' : 'var(--text-primary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', minWidth: '60px' }}>
+                    {formatHour(hour)}
+                    {hour >= LUNCH_START && hour < LUNCH_END && ' 🍽️'}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {DAYS.map((day, dayIdx) => {
+                const dayNum = dayIdx + 1;
+                return (
+                  <tr key={day}>
+                    <td className="p-2 font-medium text-center" style={{ color: 'var(--text-primary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>{day}</td>
+                    {HOURS.map((hour) => {
+                      const slot = getSlotsAtHour(dayNum, hour);
+                      const isLunch = hour >= LUNCH_START && hour < LUNCH_END;
+                      const isStartOfSlot = slot && slot.start_hour === hour;
+                      const isInsideSlot = slot && slot.start_hour < hour && slot.end_hour > hour;
+                      const isDragTarget = dragSubject && !slot && !isLunch && isEditing;
 
-                    if (isInsideSlot) return null;
+                      if (isInsideSlot) return null;
 
-                    if (isStartOfSlot) {
-                      const duration = slot.end_hour - slot.start_hour;
-                      return (
-                        <td key={`${day}-${hour}`} colSpan={duration} className="p-0" style={{ border: '1px solid var(--border)' }}>
-                          <div className="h-full w-full rounded p-1.5 flex flex-col justify-between animate-slide-in" style={{
-                            backgroundColor: slot.is_lab ? 'var(--surface)' : 'var(--accent-light)',
-                            borderLeft: `4px solid ${slot.is_lab ? 'var(--accent)' : 'var(--accent)'}`,
-                            minHeight: '60px',
-                            height: '100%',
-                            color: 'var(--text-primary)',
-                          }}>
-                            <div className="font-medium text-xs flex items-center gap-1">
-                              {slot.subject_code}
-                              {slot.is_lab && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>🧪</span>}
+                      if (isStartOfSlot) {
+                        const duration = slot.end_hour - slot.start_hour;
+                        return (
+                          <td key={`${day}-${hour}`} colSpan={duration} className="p-0" style={{ border: '1px solid var(--border)' }}>
+                            <div className="h-full w-full rounded p-1.5 flex flex-col justify-between animate-slide-in" style={{
+                              backgroundColor: slot.is_lab ? 'var(--surface)' : 'var(--accent-light)',
+                              borderLeft: `4px solid ${slot.is_lab ? 'var(--accent)' : 'var(--accent)'}`,
+                              minHeight: '60px',
+                              height: '100%',
+                              color: 'var(--text-primary)',
+                            }}>
+                              <div className="font-medium text-xs flex items-center gap-1">
+                                {slot.subject_code}
+                                {slot.is_lab && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>🧪</span>}
+                              </div>
+                              {isEditing && <button onClick={() => removeSlot(slot)} className="self-end p-0.5 rounded hover:bg-opacity-20" style={{ color: 'var(--danger)' }}><X size={12} /></button>}
                             </div>
-                            {isEditing && <button onClick={() => removeSlot(slot)} className="self-end p-0.5 rounded hover:bg-opacity-20" style={{ color: 'var(--danger)' }}><X size={12} /></button>}
-                          </div>
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td
+                          key={`${day}-${hour}`}
+                          onDrop={(e) => handleDrop(e, dayNum, hour)}
+                          onDragOver={handleDragOver}
+                          className={`p-0 text-center transition ${isDragTarget ? 'cursor-pointer' : ''}`}
+                          style={{
+                            border: '1px solid var(--border)',
+                            backgroundColor: isLunch ? 'rgba(212, 167, 74, 0.12)' : (isDragTarget ? 'rgba(76, 175, 80, 0.15)' : 'var(--card)'),
+                            height: '60px',
+                            outline: isDragTarget ? '2px dashed var(--accent)' : 'none',
+                          }}
+                        >
+                          {isLunch ? <span className="text-sm" style={{ color: 'var(--text-muted)' }}>🍽️</span> : isEditing && dragSubject ? <span className="text-xs" style={{ color: 'var(--text-muted)' }}>+</span> : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>·</span>}
                         </td>
                       );
-                    }
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* Mobile Day View */
+        <div className="space-y-4">
+          {DAYS.map((day, dayIdx) => {
+            const dayNum = dayIdx + 1;
+            const daySlots = slots.filter(s => s.day_of_week === dayNum).sort((a, b) => a.start_hour - b.start_hour);
+            return (
+              <div key={day} className="rounded-lg p-4" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{day}</h3>
+                  {isEditing && (
+                    <button
+                      onClick={() => {
+                        // Find first free hour
+                        const usedHours = new Set(daySlots.map(s => s.start_hour));
+                        let freeHour = 9;
+                        for (let h = 9; h < 17; h++) {
+                          if (!usedHours.has(h) && !(h >= LUNCH_START && h < LUNCH_END)) {
+                            freeHour = h;
+                            break;
+                          }
+                        }
+                        openAddModal(dayNum, freeHour);
+                      }}
+                      className="p-1 rounded" style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}
+                    >
+                      <Plus size={18} />
+                    </button>
+                  )}
+                </div>
+                {daySlots.length === 0 ? (
+                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>No classes</div>
+                ) : (
+                  daySlots.map((slot, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-1 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatHour(slot.start_hour)}–{formatHour(slot.end_hour)}</span>
+                        <span className="font-medium text-sm">{slot.subject_code}</span>
+                        {slot.is_lab && <span className="text-xs">🧪</span>}
+                      </div>
+                      {isEditing && <button onClick={() => removeSlot(slot)} className="p-1" style={{ color: 'var(--danger)' }}><X size={16} /></button>}
+                    </div>
+                  ))
+                )}
+                {isEditing && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {HOURS.map(h => {
+                      const existing = getSlotsAtHour(dayNum, h);
+                      const isLunch = h >= LUNCH_START && h < LUNCH_END;
+                      if (existing) return null;
+                      if (isLunch) return null;
+                      return (
+                        <button
+                          key={h}
+                          onClick={() => openAddModal(dayNum, h)}
+                          className="px-2 py-1 rounded text-xs"
+                          style={{ backgroundColor: 'var(--accent-light)', color: 'var(--text-primary)' }}
+                        >
+                          {formatHour(h)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                    return (
-                      <td
-                        key={`${day}-${hour}`}
-                        onDrop={(e) => handleDrop(e, dayNum, hour)}
-                        onDragOver={handleDragOver}
-                        className={`p-0 text-center transition ${isDragTarget ? 'cursor-pointer' : ''}`}
-                        style={{
-                          border: '1px solid var(--border)',
-                          backgroundColor: isLunch ? 'rgba(212, 167, 74, 0.12)' : (isDragTarget ? 'rgba(76, 175, 80, 0.15)' : 'var(--card)'),
-                          height: '60px',
-                          outline: isDragTarget ? '2px dashed var(--accent)' : 'none',
-                        }}
-                      >
-                        {isLunch ? <span className="text-sm" style={{ color: 'var(--text-muted)' }}>🍽️</span> : isEditing && dragSubject ? <span className="text-xs" style={{ color: 'var(--text-muted)' }}>+</span> : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>·</span>}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* Mobile Add Subject Modal */}
+      {isMobile && showAddModal && selectedDayForAdd !== null && selectedHourForAdd !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(44, 37, 32, 0.6)' }}
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            className="max-w-sm w-full rounded-lg shadow-xl p-6"
+            style={{ backgroundColor: 'var(--card)', color: 'var(--text-primary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">➕ Add Subject</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-1 rounded hover:bg-opacity-10" style={{ color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                {DAYS[selectedDayForAdd - 1]} at {formatHour(selectedHourForAdd)}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {subjects.map((subj) => (
+                  <button
+                    key={subj.code}
+                    onClick={() => addSlotFromModal(subj)}
+                    className="px-3 py-2 rounded text-sm flex items-center gap-1"
+                    style={{ backgroundColor: 'var(--accent-light)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  >
+                    {subj.code}
+                    {subj.is_lab && <span className="text-xs">🧪</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 text-xs flex flex-wrap gap-3" style={{ color: 'var(--text-secondary)' }}>
         <span style={{ color: 'var(--text-primary)' }}>🟦 Theory (1h)</span>
         <span style={{ color: 'var(--text-primary)' }}>🟩 Labs (3h)</span>
         <span>🍽️ Lunch (1-2pm)</span>
         <span>⏰ 9am–5pm</span>
-        {isEditing && <span className="text-xs" style={{ color: 'var(--warning)' }}>✏️ Drag to add, X to remove</span>}
+        {isEditing && <span className="text-xs" style={{ color: 'var(--warning)' }}>✏️ {isMobile ? 'Tap + to add, X to remove' : 'Drag to add, X to remove'}</span>}
         {!isEditing && <span className="text-xs" style={{ color: 'var(--success)' }}>🔒 Saved – attendance preserved</span>}
       </div>
 

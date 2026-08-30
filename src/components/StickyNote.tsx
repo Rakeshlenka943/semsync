@@ -2,24 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Highlighter } from 'lucide-react';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 export const StickyNote: React.FC = () => {
   const { user } = useAuth();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [isSaving, setIsSaving] = useState(false);
   const [showHighlighter, setShowHighlighter] = useState(false);
-  const [selectionStart, setSelectionStart] = useState<number | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInternalChange = useRef(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -55,39 +48,63 @@ export const StickyNote: React.FC = () => {
     }, 500);
   };
 
+  const getSelectionRange = (): { start: number; end: number } | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(editorRef.current!);
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
+    const start = preCaretRange.toString().length;
+    const end = start + sel.toString().length;
+    return { start, end };
+  };
+
   const handleDoubleClick = () => {
-    const selection = window.getSelection();
-    if (selection && selection.toString().length > 0) {
-      const range = selection.getRangeAt(0);
-      const preCaretRange = range.cloneRange();
-      preCaretRange.selectNodeContents(editorRef.current!);
-      preCaretRange.setEnd(range.startContainer, range.startOffset);
-      const start = preCaretRange.toString().length;
-      const end = start + selection.toString().length;
-      setSelectionStart(start);
-      setSelectionEnd(end);
+    const sel = window.getSelection();
+    if (sel && sel.toString().length > 0) {
+      const range = getSelectionRange();
+      if (range) setSelectionRange(range);
       setShowHighlighter(true);
     } else {
       setShowHighlighter(false);
-      setSelectionStart(null);
-      setSelectionEnd(null);
+      setSelectionRange(null);
     }
   };
 
+  // For mobile: touch selection detection via selectionchange
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (sel && sel.toString().length > 0 && document.activeElement === editorRef.current) {
+        const range = getSelectionRange();
+        if (range) setSelectionRange(range);
+        setShowHighlighter(true);
+      } else {
+        // Don't hide immediately to allow button click
+      }
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
+
   const applyHighlight = () => {
-    if (!editorRef.current || selectionStart === null || selectionEnd === null) return;
-    editorRef.current.focus();
-    const selection = window.getSelection();
-    if (!selection || selection.toString().length === 0) {
+    if (!editorRef.current || !selectionRange) {
+      setShowHighlighter(false);
+      return;
+    }
+    const sel = window.getSelection();
+    if (!sel || sel.toString().length === 0) {
       setShowHighlighter(false);
       return;
     }
     try {
+      // Use execCommand as fallback, but we'll also manually wrap
       document.execCommand('hiliteColor', false, '#00FF66');
       document.execCommand('foreColor', false, '#000000');
     } catch (e) {
-      // Fallback for mobile
-      const range = selection.getRangeAt(0);
+      // Fallback: wrap selected text with span
+      const range = sel.getRangeAt(0);
       const span = document.createElement('span');
       span.style.backgroundColor = '#00FF66';
       span.style.color = '#000000';
@@ -95,16 +112,14 @@ export const StickyNote: React.FC = () => {
       range.surroundContents(span);
     }
     setShowHighlighter(false);
-    setSelectionStart(null);
-    setSelectionEnd(null);
+    setSelectionRange(null);
     handleInput();
   };
 
   const handleBlur = () => {
     setTimeout(() => {
       setShowHighlighter(false);
-      setSelectionStart(null);
-      setSelectionEnd(null);
+      setSelectionRange(null);
     }, 200);
   };
 
