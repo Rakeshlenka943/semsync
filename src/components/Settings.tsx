@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Calendar, Database, Shield, 
   CheckCircle, AlertTriangle, Download, Upload, 
   X, Loader2, Lock, Target, ChevronRight, BookOpen,
-  Edit2, Save, Image
+  Edit2, Save, Image, Link, Github, Bot, FileText, FlaskConical, Calculator
 } from 'lucide-react';
 
 interface SettingsProps {
@@ -41,7 +41,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [semesterDates, setSemesterDates] = useState<SemesterDates | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'general' | 'semester' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'semester' | 'data' | 'links'>('general');
   const [subjects, setSubjects] = useState<SubjectTarget[]>([]);
   const [editingSubject, setEditingSubject] = useState<string | null>(null);
   const [tempTarget, setTempTarget] = useState<number>(75);
@@ -328,6 +328,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   const isSemesterEnded = semesterDates?.semester_end && new Date(semesterDates.semester_end) < new Date();
 
+  // Helper: open link in new tab
+  const openLink = (url: string) => {
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="p-4 max-w-4xl mx-auto pb-24" style={{ backgroundColor: 'var(--bg)', minHeight: '100vh' }}>
       <div className="flex items-center gap-4 mb-6">
@@ -337,11 +342,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>⚙️ Settings & Account</h1>
       </div>
 
-      <div className="flex gap-2 mb-6 border-b" style={{ borderColor: 'var(--border)' }}>
+      <div className="flex gap-2 mb-6 border-b overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
         {[
           { id: 'general', label: 'General', icon: User },
           { id: 'semester', label: 'Semester', icon: Calendar },
           { id: 'data', label: 'Data', icon: Database },
+          { id: 'links', label: 'Links', icon: Link },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -349,7 +355,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className="px-4 py-2 flex items-center gap-2 text-sm font-medium border-b-2 transition"
+              className="px-4 py-2 flex items-center gap-2 text-sm font-medium border-b-2 transition whitespace-nowrap"
               style={{
                 color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                 borderColor: isActive ? 'var(--accent)' : 'transparent',
@@ -385,7 +391,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   src={getAvatarPath(selectedAvatar)}
                   alt="avatar"
                   className="w-full h-full object-cover"
-                  key={selectedAvatar} // force re-render on change
+                  key={selectedAvatar}
                 />
               </div>
               <div>
@@ -670,6 +676,125 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             >
               🗑️ Delete Account
             </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'links' && (
+        <div className="space-y-6">
+          {/* About / Version */}
+          <div className="p-4 rounded-lg text-center" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
+            <p className="text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>
+              SemSync v<span className="font-bold" style={{ color: 'var(--accent)' }}>3.14.159</span>
+            </p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              Built with ❤️ by Rakesh & Omm
+            </p>
+          </div>
+
+          {/* GitHub Profiles */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => openLink('https://github.com/Rakeshlenka943/')}
+              className="p-4 rounded-lg border hover:bg-opacity-5 transition flex items-center gap-3 text-left"
+              style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-light)' }}>
+                <Github size={20} style={{ color: 'var(--accent)' }} />
+              </div>
+              <div>
+                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Rakesh Lenka</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>@Rakeshlenka943</p>
+              </div>
+              <ChevronRight size={18} className="ml-auto" style={{ color: 'var(--text-muted)' }} />
+            </button>
+
+            <button
+              onClick={() => openLink('https://github.com/OmmPradhan-debug')}
+              className="p-4 rounded-lg border hover:bg-opacity-5 transition flex items-center gap-3 text-left"
+              style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-light)' }}>
+                <Github size={20} style={{ color: 'var(--accent)' }} />
+              </div>
+              <div>
+                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Omm Pradhan</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>@OmmPradhan-debug</p>
+              </div>
+              <ChevronRight size={18} className="ml-auto" style={{ color: 'var(--text-muted)' }} />
+            </button>
+          </div>
+
+          {/* Useful Links */}
+          <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Link size={18} /> Useful Links
+            </h3>
+            <div className="space-y-2">
+              {/* Notes Bot */}
+              <button
+                onClick={() => openLink('https://t.me/WizofNotes_bot')}
+                className="w-full p-3 rounded-lg border hover:bg-opacity-5 transition flex items-center gap-3 text-left"
+                style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 136, 204, 0.15)' }}>
+                  <Bot size={16} style={{ color: '#0088cc' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>@WizofNotes_bot</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Telegram bot for notes</p>
+                </div>
+                <ChevronRight size={16} className="ml-auto" style={{ color: 'var(--text-muted)' }} />
+              </button>
+
+              {/* Cover Page Editor */}
+              <button
+                onClick={() => openLink('https://hiteshpanigrahi.github.io/LabRecord_CoverPageEditor_App/')}
+                className="w-full p-3 rounded-lg border hover:bg-opacity-5 transition flex items-center gap-3 text-left"
+                style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(124, 165, 140, 0.15)' }}>
+                  <FileText size={16} style={{ color: 'var(--success)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Cover Page Editor</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Lab Records & Assignments</p>
+                </div>
+                <ChevronRight size={16} className="ml-auto" style={{ color: 'var(--text-muted)' }} />
+              </button>
+
+              {/* Physics Lab Assistant */}
+              <button
+                onClick={() => openLink('https://ommpradhan-debug.github.io/Virtual-Physics-Lab-Experiment/')}
+                className="w-full p-3 rounded-lg border hover:bg-opacity-5 transition flex items-center gap-3 text-left"
+                style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 123, 90, 0.15)' }}>
+                  <FlaskConical size={16} style={{ color: 'var(--accent)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Physics Lab Assistant</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Virtual Physics Lab Experiments</p>
+                </div>
+                <ChevronRight size={16} className="ml-auto" style={{ color: 'var(--text-muted)' }} />
+              </button>
+
+              {/* SGPA Calculator */}
+              <button
+                onClick={() => openLink('https://sgpacalculatoroutr.tiiny.site/index.html')}
+                className="w-full p-3 rounded-lg border hover:bg-opacity-5 transition flex items-center gap-3 text-left"
+                style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 167, 74, 0.15)' }}>
+                  <Calculator size={16} style={{ color: 'var(--warning)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>SGPA Calculator</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>OUTR SGPA Calculator</p>
+                </div>
+                <ChevronRight size={16} className="ml-auto" style={{ color: 'var(--text-muted)' }} />
+              </button>
+            </div>
           </div>
         </div>
       )}
