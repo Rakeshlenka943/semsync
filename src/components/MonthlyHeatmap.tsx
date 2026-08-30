@@ -24,6 +24,7 @@ interface TimetableSlot {
 
 interface AttendanceLog {
   user_roll: string;
+  slot_id: string;
   subject_code: string;
   log_date: string;
   status: 'present' | 'absent' | 'teacher_absent' | 'proxy' | 'holiday';
@@ -312,18 +313,21 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (slotsData) setSlots(slotsData);
   };
 
-  // Action functions – using subject_code
-  const markSlot = async (subjectCode: string, date: Date, status: string) => {
+  // Action functions – using slot_id
+  const markSlot = async (slotId: string, date: Date, status: string) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
+    const slot = slots.find(s => s.id === slotId);
+    if (!slot) return;
     await supabase
       .from('attendance_logs')
       .upsert({
         user_roll: user.roll_number,
-        subject_code: subjectCode,
+        slot_id: slotId,
+        subject_code: slot.subject_code,
         log_date: dateStr,
         status,
-      }, { onConflict: 'user_roll, subject_code, log_date' });
+      }, { onConflict: 'user_roll, slot_id, log_date' });
     refreshLogs();
     setSelectedDay(date);
   };
@@ -336,10 +340,11 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         .from('attendance_logs')
         .upsert({
           user_roll: user.roll_number,
+          slot_id: cls.slot.id,
           subject_code: cls.slot.subject_code,
           log_date: dateStr,
           status: 'holiday',
-        }, { onConflict: 'user_roll, subject_code, log_date' });
+        }, { onConflict: 'user_roll, slot_id, log_date' });
     }
     refreshLogs();
     setSelectedDay(date);
@@ -360,13 +365,14 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     }
     const entries = daySlots.map(slot => ({
       user_roll: user.roll_number,
+      slot_id: slot.id,
       subject_code: slot.subject_code,
       log_date: dateStr,
       status,
     }));
     const { error } = await supabase
       .from('attendance_logs')
-      .upsert(entries, { onConflict: 'user_roll, subject_code, log_date' });
+      .upsert(entries, { onConflict: 'user_roll, slot_id, log_date' });
     if (error) {
       console.error('Bulk upsert error:', error);
       alert('Failed to update attendance. Please try again.');
@@ -389,12 +395,12 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       alert('No classes found for this day.');
       return;
     }
-    const subjectCodes = daySlots.map(s => s.subject_code);
+    const slotIds = daySlots.map(s => s.id);
     const { error } = await supabase
       .from('attendance_logs')
       .delete()
       .eq('user_roll', user.roll_number)
-      .in('subject_code', subjectCodes)
+      .in('slot_id', slotIds)
       .eq('log_date', dateStr);
     if (error) {
       console.error('Bulk delete error:', error);
@@ -405,7 +411,6 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Holiday for the day – marks all subjects as holiday
   const markDayAsHoliday = async (date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -420,13 +425,14 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     }
     const entries = daySlots.map(slot => ({
       user_roll: user.roll_number,
+      slot_id: slot.id,
       subject_code: slot.subject_code,
       log_date: dateStr,
       status: 'holiday',
     }));
     const { error } = await supabase
       .from('attendance_logs')
-      .upsert(entries, { onConflict: 'user_roll, subject_code, log_date' });
+      .upsert(entries, { onConflict: 'user_roll, slot_id, log_date' });
     if (error) {
       console.error('Holiday upsert error:', error);
       alert('Failed to mark holiday. Please try again.');
@@ -445,7 +451,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         .from('attendance_logs')
         .delete()
         .eq('user_roll', user.roll_number)
-        .eq('subject_code', slot.subject_code)
+        .eq('slot_id', slotId)
         .eq('log_date', dateStr);
     }
     await supabase.from('timetable_slots').delete().eq('id', slotId);
@@ -458,19 +464,21 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     const dayOfWeek = date.getDay();
+    // Check if there's already an extra slot for this subject on this date
     const existingSlot = slots.find(s => 
       s.subject_code === subjectCode && s.specific_date === dateStr
     );
     if (existingSlot) {
-      // If exists, mark it as present
+      // If exists, just mark it as present
       await supabase
         .from('attendance_logs')
         .upsert({
           user_roll: user.roll_number,
+          slot_id: existingSlot.id,
           subject_code: subjectCode,
           log_date: dateStr,
           status: 'present',
-        }, { onConflict: 'user_roll, subject_code, log_date' });
+        }, { onConflict: 'user_roll, slot_id, log_date' });
       refreshLogs();
       setSelectedDay(date);
       setShowExtraClassModal(false);
@@ -508,24 +516,25 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       .from('attendance_logs')
       .upsert({
         user_roll: user.roll_number,
+        slot_id: newSlot.id,
         subject_code: sourceSlot.subject_code,
         log_date: dateStr,
         status: 'present',
-      }, { onConflict: 'user_roll, subject_code, log_date' });
+      }, { onConflict: 'user_roll, slot_id, log_date' });
     await refreshSlots();
     refreshLogs();
     setSelectedDay(date);
     setShowExtraClassModal(false);
   };
 
-  const clearSlot = async (subjectCode: string, date: Date) => {
+  const clearSlot = async (slotId: string, date: Date) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
     await supabase
       .from('attendance_logs')
       .delete()
       .eq('user_roll', user.roll_number)
-      .eq('subject_code', subjectCode)
+      .eq('slot_id', slotId)
       .eq('log_date', dateStr);
     refreshLogs();
     setSelectedDay(date);
@@ -579,7 +588,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         daySlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
         daySlots.forEach(slot => {
           const log = allLogs.find(l => 
-            l.subject_code === slot.subject_code && l.log_date === dateStr
+            l.slot_id === slot.id && l.log_date === dateStr
           );
           dayClasses.push({
             slot,
@@ -1087,13 +1096,13 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                                     tooltip={optionTooltips[option] || ''}
                                     onClick={() => {
                                       if (isClear) {
-                                        clearSlot(subject.code, selectedDay);
+                                        clearSlot(subject.slot.id, selectedDay);
                                         return;
                                       }
                                       if (option === 'holiday') {
                                         markDayHoliday(selectedDay, dayData.classes);
                                       } else {
-                                        markSlot(subject.code, selectedDay, option);
+                                        markSlot(subject.slot.id, selectedDay, option);
                                       }
                                     }}
                                     style={{
