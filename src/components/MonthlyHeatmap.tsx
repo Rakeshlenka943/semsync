@@ -82,39 +82,12 @@ function getStatusColor(status: string): string {
 function getSubjectStatsUpToDate(
   subjectCode: string,
   allLogs: AttendanceLog[],
-  allSlots: TimetableSlot[],
   upToDate: Date,
   subjectName: string,
   isLab: boolean,
   target: number
 ): SubjectAttendanceStats {
   const upToDateStr = getLocalDateStr(upToDate);
-  // Find all slots for this subject (regular + extra)
-  const subjectSlots = allSlots.filter(s => s.subject_code === subjectCode);
-  // Count total classes up to the date:
-  // For regular slots: they occur on every day_of_week up to the date.
-  // For extra slots: they occur only on their specific_date.
-  let totalClasses = 0;
-  const currentDate = new Date(upToDate);
-  currentDate.setHours(0, 0, 0, 0);
-  const startDate = new Date(upToDate);
-  startDate.setMonth(startDate.getMonth()); // same month
-  startDate.setDate(1);
-  startDate.setHours(0, 0, 0, 0);
-  // Iterate day by day from start of month to upToDate
-  const iterDate = new Date(startDate);
-  while (iterDate <= currentDate) {
-    const dateStr = getLocalDateStr(iterDate);
-    const dayOfWeek = iterDate.getDay(); // 0=Sun, 6=Sat
-    // Count regular slots for this day
-    const regularSlots = subjectSlots.filter(s => !s.specific_date && s.day_of_week === dayOfWeek);
-    // Count extra slots for this specific date
-    const extraSlots = subjectSlots.filter(s => s.specific_date === dateStr);
-    totalClasses += regularSlots.length + extraSlots.length;
-    iterDate.setDate(iterDate.getDate() + 1);
-  }
-
-  // Now gather logs for this subject up to date
   const relevantLogs = allLogs.filter(log => {
     return log.subject_code === subjectCode && log.log_date <= upToDateStr;
   });
@@ -128,10 +101,9 @@ function getSubjectStatsUpToDate(
     else if (log.status === 'holiday') stats.holiday++;
   });
 
-  // totalClasses already counts all scheduled classes.
-  // offs = teacher_absent + holiday (these are logs that mark class as not counted)
+  const total = stats.present + stats.absent + stats.teacher_absent + stats.proxy + stats.holiday;
   const offs = stats.teacher_absent + stats.holiday;
-  const effectiveTotal = totalClasses - offs;
+  const effectiveTotal = total - offs;
   const attended = stats.present + stats.proxy;
   const percentage = effectiveTotal > 0 ? (attended / effectiveTotal) * 100 : 0;
 
@@ -139,7 +111,7 @@ function getSubjectStatsUpToDate(
     subject_code: subjectCode,
     subject_name: subjectName,
     is_lab: isLab,
-    total: totalClasses,
+    total,
     present: stats.present,
     absent: stats.absent,
     teacher_absent: stats.teacher_absent,
@@ -294,7 +266,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       if (semData?.semester_start) setSemesterStartDate(new Date(semData.semester_start));
       if (semData?.semester_end) setSemesterEndDate(new Date(semData.semester_end));
 
-      // Fetch active slots (including extras)
+      // Fetch active slots
       const { data: slotsData } = await supabase
         .from('timetable_slots')
         .select('*')
@@ -340,7 +312,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     if (slotsData) setSlots(slotsData);
   };
 
-  // Action functions
+  // Action functions – using subject_code
   const markSlot = async (subjectCode: string, date: Date, status: string) => {
     if (!user) return;
     const dateStr = getLocalDateStr(date);
@@ -490,6 +462,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       s.subject_code === subjectCode && s.specific_date === dateStr
     );
     if (existingSlot) {
+      // If exists, mark it as present
       await supabase
         .from('attendance_logs')
         .upsert({
@@ -508,18 +481,37 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
       alert('Subject not found in your timetable. Please add it in Timetable Builder first.');
       return;
     }
-    await supabase.from('timetable_slots').insert({
-      user_roll: user.roll_number,
-      day_of_week: dayOfWeek,
-      start_time: '09:00:00',
-      end_time: '10:00:00',
-      subject_code: sourceSlot.subject_code,
-      subject_name: sourceSlot.subject_name,
-      is_lab: sourceSlot.is_lab,
-      specific_date: dateStr,
-      is_extra_class: true,
-      is_active: true,
-    });
+    // Insert new extra slot
+    const { data: newSlot, error: insertError } = await supabase
+      .from('timetable_slots')
+      .insert({
+        user_roll: user.roll_number,
+        day_of_week: dayOfWeek,
+        start_time: '09:00:00',
+        end_time: '10:00:00',
+        subject_code: sourceSlot.subject_code,
+        subject_name: sourceSlot.subject_name,
+        is_lab: sourceSlot.is_lab,
+        specific_date: dateStr,
+        is_extra_class: true,
+        is_active: true,
+      })
+      .select()
+      .single();
+    if (insertError) {
+      console.error('Error inserting extra slot:', insertError);
+      alert('Failed to add extra class.');
+      return;
+    }
+    // Mark as present
+    await supabase
+      .from('attendance_logs')
+      .upsert({
+        user_roll: user.roll_number,
+        subject_code: sourceSlot.subject_code,
+        log_date: dateStr,
+        status: 'present',
+      }, { onConflict: 'user_roll, subject_code, log_date' });
     await refreshSlots();
     refreshLogs();
     setSelectedDay(date);
@@ -539,11 +531,11 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Build calendar
+  // Build calendar (timezone-safe)
   const buildCalendar = (): any[][] => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    const startDay = firstDayOfMonth.getDay(); // 0=Sun, 6=Sat
+    const startDay = firstDayOfMonth.getDay();
     const daysInMonth = lastDayOfMonth.getDate();
     const weeks: any[][] = [];
     let currentWeek: any[] = [];
@@ -587,8 +579,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         daySlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
         daySlots.forEach(slot => {
           const log = allLogs.find(l => 
-            l.subject_code === slot.subject_code && 
-            l.log_date === dateStr
+            l.subject_code === slot.subject_code && l.log_date === dateStr
           );
           dayClasses.push({
             slot,
@@ -949,7 +940,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     )}
                   </div>
 
-                  {/* Quick Actions – Now includes Holiday button */}
+                  {/* Quick Actions – includes Holiday button */}
                   <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-xs font-medium mr-1" style={{ color: 'var(--text-secondary)' }}>⚡ Quick:</span>
@@ -991,7 +982,6 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                     const stats = getSubjectStatsUpToDate(
                       subject.code,
                       allLogs,
-                      slots,
                       selectedDay,
                       subject.slot.subject_name,
                       subject.slot.is_lab,

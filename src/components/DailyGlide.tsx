@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Clock, MoreVertical, X } from 'lucide-react';
+import { Clock, MoreVertical, Calendar } from 'lucide-react';
 
 interface TimetableSlot {
   id: string;
@@ -11,13 +11,6 @@ interface TimetableSlot {
   subject_code: string;
   subject_name: string;
   is_lab: boolean;
-}
-
-interface AttendanceLog {
-  user_roll: string;
-  subject_code: string;
-  log_date: string;
-  status: 'present' | 'absent' | 'teacher_absent' | 'proxy' | 'holiday';
 }
 
 function getDayOfWeek(): number {
@@ -86,7 +79,7 @@ export const DailyGlide: React.FC = () => {
         return;
       }
 
-      // Deduplicate by subject_code
+      // Deduplicate by subject_code (in case of multiple entries)
       const uniqueSlots = slotsData
         ? Array.from(new Map(slotsData.map(s => [s.subject_code, s])).values())
         : [];
@@ -109,7 +102,7 @@ export const DailyGlide: React.FC = () => {
       const todayMap = new Map<string, string>();
 
       if (allLogs) {
-        allLogs.forEach((log: AttendanceLog) => {
+        allLogs.forEach((log: any) => {
           const { subject_code, log_date, status } = log;
           if (log_date === todayStr) {
             todayMap.set(subject_code, status);
@@ -136,7 +129,6 @@ export const DailyGlide: React.FC = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     
     if (status === 'clear') {
-      // Delete today's log for this subject
       const { error } = await supabase
         .from('attendance_logs')
         .delete()
@@ -153,7 +145,6 @@ export const DailyGlide: React.FC = () => {
       return;
     }
 
-    // Upsert
     const { error } = await supabase
       .from('attendance_logs')
       .upsert({
@@ -167,6 +158,30 @@ export const DailyGlide: React.FC = () => {
       newMap.set(subjectCode, status);
       setTodayLogs(newMap);
       setShowActions(null);
+      refreshStats();
+    }
+  };
+
+  const markAllHoliday = async () => {
+    if (!user) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (!window.confirm('Mark ALL classes today as Holiday?')) return;
+
+    const entries = slots.map(slot => ({
+      user_roll: user.roll_number,
+      subject_code: slot.subject_code,
+      log_date: todayStr,
+      status: 'holiday',
+    }));
+
+    const { error } = await supabase
+      .from('attendance_logs')
+      .upsert(entries, { onConflict: 'user_roll, subject_code, log_date' });
+
+    if (!error) {
+      const newMap = new Map(todayLogs);
+      slots.forEach(slot => newMap.set(slot.subject_code, 'holiday'));
+      setTodayLogs(newMap);
       refreshStats();
     }
   };
@@ -205,7 +220,17 @@ export const DailyGlide: React.FC = () => {
 
   return (
     <div className="space-y-3 p-4">
-      <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>📅 Today's Classes</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>📅 Today's Classes</h2>
+        <button
+          onClick={markAllHoliday}
+          className="px-3 py-1 rounded text-xs flex items-center gap-1"
+          style={{ backgroundColor: '#4caf50', color: '#fff' }}
+        >
+          <Calendar size={14} /> Holiday
+        </button>
+      </div>
+
       {slots.map((slot) => {
         const status = todayLogs.get(slot.subject_code) || 'present';
         const isHoliday = status === 'holiday';
@@ -221,8 +246,8 @@ export const DailyGlide: React.FC = () => {
             key={slot.id}
             className="rounded-lg border p-4 transition-all relative"
             style={{
-              backgroundColor: 'var(--card)',
-              borderColor: 'var(--border)',
+              backgroundColor: isHoliday ? 'rgba(76, 175, 80, 0.1)' : 'var(--card)',
+              borderColor: isHoliday ? '#4caf50' : 'var(--border)',
               boxShadow: 'var(--shadow)',
             }}
           >
@@ -234,7 +259,7 @@ export const DailyGlide: React.FC = () => {
                   </span>
                   {isHoliday && (
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#4caf50', color: '#fff' }}>
-                      Holiday
+                      🏖️ Holiday
                     </span>
                   )}
                   {isCustomTarget && (
@@ -275,7 +300,6 @@ export const DailyGlide: React.FC = () => {
               </button>
             </div>
 
-            {/* Quick Actions Dropdown */}
             {showActions === slot.subject_code && (
               <div
                 className="absolute right-0 top-full mt-1 z-10 w-48 rounded-lg shadow-lg border p-2"
