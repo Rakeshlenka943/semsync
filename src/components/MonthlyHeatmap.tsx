@@ -45,7 +45,7 @@ interface SubjectAttendanceStats {
   percentage: number;
 }
 
-// Helper: local date string YYYY-MM-DD
+// Simple local date string (YYYY-MM-DD)
 function getLocalDateStr(date: Date): string {
   return date.toLocaleDateString('en-CA');
 }
@@ -539,21 +539,28 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
     setSelectedDay(date);
   };
 
-  // Build calendar using local dates (no UTC)
+  // ============================================================
+  // SIMPLE CALENDAR BUILDER – NO TIMEZONE TRICKS
+  // ============================================================
   const buildCalendar = (): any[][] => {
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    const startDay = firstDayOfMonth.getDay(); // 0=Sun
-    const daysInMonth = lastDayOfMonth.getDate();
-    const weeks: any[][] = [];
-    let currentWeek: any[] = [];
     const today = new Date();
     const todayStr = getLocalDateStr(today);
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const startDay = firstDay.getDay(); // 0=Sun, 6=Sat
+    const daysInMonth = lastDay.getDate();
+    const weeks: any[][] = [];
+    let currentWeek: any[] = [];
+
+    // Fill empty cells before the first day of the month
+    for (let i = 0; i < startDay; i++) {
+      currentWeek.push(null);
+    }
 
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(currentYear, currentMonth, d);
-      const dayOfWeek = date.getDay();
       const dateStr = getLocalDateStr(date);
+      const dayOfWeek = date.getDay();
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       let isBeforeSemesterStart = false;
@@ -650,7 +657,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         dayColor = 'var(--text-muted)';
       }
 
-      currentWeek.push({
+      const dayData = {
         date,
         dayOfWeek,
         isToday: dateStr === todayStr,
@@ -664,30 +671,22 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
         dayEmoji,
         dayColor,
         percentage,
-      });
+      };
 
-      if (dayOfWeek === 6 || d === daysInMonth) {
-        while (currentWeek.length < 7) {
-          currentWeek.push({
-            date: new Date(0),
-            dayOfWeek: -1,
-            isToday: false,
-            isFuture: false,
-            isWeekend: false,
-            isOutsideSemester: true,
-            classes: [],
-            hasClasses: false,
-            hasData: false,
-            dayStatus: 'OFF',
-            dayEmoji: '·',
-            dayColor: 'var(--text-muted)',
-            percentage: 0,
-          });
-        }
+      currentWeek.push(dayData);
+
+      if (currentWeek.length === 7) {
         weeks.push(currentWeek);
         currentWeek = [];
       }
     }
+
+    // Pad the last week with null cells
+    while (currentWeek.length > 0 && currentWeek.length < 7) {
+      currentWeek.push(null);
+    }
+    if (currentWeek.length > 0) weeks.push(currentWeek);
+
     return weeks;
   };
 
@@ -813,28 +812,33 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
             </tr>
           </thead>
           <tbody>
-            {weeks.map((week, weekIdx) => (
-              <tr key={weekIdx}>
-                {week.map((day, dayIdx) => {
-                  const isToday = day.isToday;
-                  const canClick = day.hasClasses && !day.isOutsideSemester && !day.isFuture && !day.isWeekend;
-                  let bgColor = 'transparent';
-                  if (day.isOutsideSemester) bgColor = 'rgba(0,0,0,0.03)';
-                  else if (isToday) bgColor = 'var(--accent-light)';
-                  else if (day.dayStatus === 'FULL') bgColor = 'rgba(124, 165, 140, 0.2)';
-                  else if (day.dayStatus === 'MIXED') bgColor = 'rgba(212, 167, 74, 0.2)';
-                  else if (day.dayStatus === 'OFF') bgColor = 'rgba(0,0,0,0.03)';
-                  const borderStyle = isToday ? '2px solid #3b82f6' : '1px solid var(--border)';
-                  const opacity = day.isOutsideSemester ? 0.4 : 1;
-                  const cursor = canClick ? 'pointer' : 'default';
-                  return (
-                    <td
-                      key={dayIdx}
-                      className="p-1 text-center transition"
-                      style={{ border: borderStyle, backgroundColor: bgColor, opacity, cursor }}
-                      onClick={() => handleDayClick(day)}
-                    >
-                      {day.date.getTime() > 0 ? (
+            {weeks.map((week, weekIdx) => {
+              // Skip if all cells are null
+              if (week.every(cell => cell === null)) return null;
+              return (
+                <tr key={weekIdx}>
+                  {week.map((day, dayIdx) => {
+                    if (day === null) {
+                      return <td key={dayIdx} style={{ border: '1px solid var(--border)', backgroundColor: 'var(--card)' }} />;
+                    }
+                    const isToday = day.isToday;
+                    const canClick = day.hasClasses && !day.isOutsideSemester && !day.isFuture && !day.isWeekend;
+                    let bgColor = 'transparent';
+                    if (day.isOutsideSemester) bgColor = 'rgba(0,0,0,0.03)';
+                    else if (isToday) bgColor = 'var(--accent-light)';
+                    else if (day.dayStatus === 'FULL') bgColor = 'rgba(124, 165, 140, 0.2)';
+                    else if (day.dayStatus === 'MIXED') bgColor = 'rgba(212, 167, 74, 0.2)';
+                    else if (day.dayStatus === 'OFF') bgColor = 'rgba(0,0,0,0.03)';
+                    const borderStyle = isToday ? '2px solid #3b82f6' : '1px solid var(--border)';
+                    const opacity = day.isOutsideSemester ? 0.4 : 1;
+                    const cursor = canClick ? 'pointer' : 'default';
+                    return (
+                      <td
+                        key={dayIdx}
+                        className="p-1 text-center transition"
+                        style={{ border: borderStyle, backgroundColor: bgColor, opacity, cursor }}
+                        onClick={() => handleDayClick(day)}
+                      >
                         <div className="flex flex-col items-center p-1">
                           <span className="text-sm font-medium" style={{ color: isToday ? 'var(--accent)' : 'var(--text-primary)', fontWeight: isToday ? 'bold' : 'normal' }}>
                             {day.date.getDate()}
@@ -844,12 +848,12 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
                             <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{Math.round(day.percentage)}%</span>
                           )}
                         </div>
-                      ) : <div className="p-1">·</div>}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -897,7 +901,7 @@ export const MonthlyHeatmap: React.FC<MonthlyHeatmapProps> = ({ onBack }) => {
 
             {(() => {
               const dateStr = getLocalDateStr(selectedDay);
-              const dayData = weeks.flat().find((d: any) => getLocalDateStr(d.date) === dateStr);
+              const dayData = weeks.flat().find((d: any) => d !== null && getLocalDateStr(d.date) === dateStr);
               if (!dayData || !dayData.hasClasses) {
                 return <div style={{ color: 'var(--text-secondary)' }}>No classes on this day.</div>;
               }
