@@ -35,8 +35,10 @@ function AppContent() {
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash && hash.includes('access_token')) {
+    if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
       setShowResetPassword(true);
+      // Clean URL to avoid issues
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
