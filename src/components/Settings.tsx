@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Calendar, Database, Shield, 
   CheckCircle, AlertTriangle, Download, Upload, 
   X, Loader2, Lock, Target, ChevronRight, BookOpen,
-  Edit2, Save, Image, Link, GitHub, Bot, FileText, FlaskConical, Calculator
+  Edit2, Save, Image, Link, Github, Bot, FileText, FlaskConical, Calculator
 } from 'lucide-react';
 
 interface SettingsProps {
@@ -700,7 +700,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
             >
               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-light)' }}>
-                <GitHub size={20} style={{ color: 'var(--accent)' }} />
+                <Github size={20} style={{ color: 'var(--accent)' }} />
               </div>
               <div>
                 <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Rakesh Lenka</p>
@@ -715,7 +715,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
             >
               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-light)' }}>
-                <GitHub size={20} style={{ color: 'var(--accent)' }} />
+                <Github size={20} style={{ color: 'var(--accent)' }} />
               </div>
               <div>
                 <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Omm Pradhan</p>
